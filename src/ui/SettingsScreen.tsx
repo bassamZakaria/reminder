@@ -2,10 +2,10 @@ import React, { useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { alarms } from '../lib/alarms';
 import { useStore } from '../store/useStore';
-import { Button, Header } from './common';
+import { Button } from './common';
 import { useTheme } from './theme';
 
-export function SettingsScreen() {
+export function SettingsScreen({ headerLeft }: { headerLeft?: React.ReactNode }) {
   const t = useTheme();
   const session = useStore(s => s.session);
   const signOut = useStore(s => s.signOut);
@@ -32,8 +32,11 @@ export function SettingsScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: t.bg }}>
-      <Header title="Settings" />
-      <View style={[styles.card, { backgroundColor: t.card, borderColor: t.border }]}>
+      <View style={styles.header}>
+        {headerLeft}
+        <Text style={[styles.title, { color: t.text }]}>Settings</Text>
+      </View>
+      <View style={[styles.card, { backgroundColor: t.pane, borderColor: t.border }]}>
         <Row label="Account" value={session?.user.email ?? '—'} />
         <Row label="Items synced" value={String(itemCount)} />
         <Row label="Notifications" value={!alarms.supported ? 'Unsupported' : permission == null ? 'Checking…' : permission ? 'Allowed' : 'Denied (enable in System Settings)'} />
@@ -52,12 +55,14 @@ function Row({ label, value }: { label: string; value: string }) {
   return (
     <View style={[styles.row, { borderBottomColor: t.border }]}>
       <Text style={{ color: t.text, fontSize: 15 }}>{label}</Text>
-      <Text style={{ color: t.muted, fontSize: 15, flexShrink: 1, textAlign: 'right' }}>{value}</Text>
+      <Text style={{ color: t.textSecondary, fontSize: 15, flexShrink: 1, textAlign: 'right' }}>{value}</Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingTop: 14, paddingBottom: 10 },
+  title: { flex: 1, fontSize: 20, fontWeight: '700' },
   card: { margin: 16, borderRadius: 12, borderWidth: StyleSheet.hairlineWidth, overflow: 'hidden' },
   row: { flexDirection: 'row', justifyContent: 'space-between', padding: 14, borderBottomWidth: StyleSheet.hairlineWidth, gap: 12 },
 });

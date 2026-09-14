@@ -1,10 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { parseDateTime, toDateInput, toTimeInput } from '../lib/dates';
 import { useLists, useStore, type EditorTarget } from '../store/useStore';
-import { REPEAT_RULES, type RepeatRule } from '../types';
-import { Chip, Header, IconButton, Input } from './common';
-import { useTheme } from './theme';
+import { REPEAT_RULES, type Priority, type RepeatRule } from '../types';
+import { PRIORITIES } from '../lib/priority';
+import { Chip, IconButton, Input } from './common';
+import { isMac, useTheme } from './theme';
 
 const QUICK: { label: string; at: () => Date }[] = [
   { label: 'In 1 hour', at: () => new Date(Date.now() + 3600_000) },
@@ -26,7 +27,8 @@ export function EditorScreen({ target }: { target: NonNullable<EditorTarget> }) 
   const [body, setBody] = useState(existing?.body ?? '');
   const [listId, setListId] = useState<string | null>(existing?.list_id ?? (target.kind === 'new' ? target.listId : null));
   const [pinned, setPinned] = useState(existing?.is_pinned ?? false);
-  const initialDue = existing?.due_at ? new Date(existing.due_at) : target.kind === 'new' && target.asReminder ? atTime(addDays(new Date(), 1), 9, 0) : null;
+  const [priority, setPriority] = useState<Priority>(existing?.priority ?? 0);
+  const initialDue = existing?.due_at ? new Date(existing.due_at) : target.kind === 'new' && target.dueAt ? new Date(target.dueAt) : target.kind === 'new' && target.asReminder ? atTime(addDays(new Date(), 1), 9, 0) : null;
   const [remind, setRemind] = useState(!!initialDue);
   const [date, setDate] = useState(initialDue ? toDateInput(initialDue) : toDateInput(new Date()));
   const [time, setTime] = useState(initialDue ? toTimeInput(initialDue) : '09:00');
@@ -46,10 +48,11 @@ export function EditorScreen({ target }: { target: NonNullable<EditorTarget> }) 
       body,
       list_id: listId,
       is_pinned: pinned,
+      priority,
       due_at: parsedDue ? parsedDue.toISOString() : null,
       repeat_rule: parsedDue ? repeat : ('none' as RepeatRule),
     }),
-    [title, body, listId, pinned, parsedDue, repeat],
+    [title, body, listId, pinned, priority, parsedDue, repeat],
   );
   const latest = useRef(payload);
   latest.current = payload;
@@ -119,24 +122,43 @@ export function EditorScreen({ target }: { target: NonNullable<EditorTarget> }) 
     ]);
   };
 
+  const toggleComplete = useStore(s => s.toggleComplete);
+  const completed = existing?.is_completed ?? false;
+
   return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, backgroundColor: t.bg }}>
-      <Header
-        title={existing ? 'Edit' : 'New'}
-        left={<IconButton label="Done" onPress={done} />}
-        right={itemId ? <IconButton label="Delete" color={t.danger} onPress={remove} /> : undefined}
-      />
+      <View style={[styles.header, { borderBottomColor: t.border }]}>
+        {isMac ? (
+          <IconButton label="✕" size={15} color={t.muted} onPress={done} />
+        ) : (
+          <IconButton label="Done" size={16} onPress={done} />
+        )}
+        <View style={{ flex: 1 }} />
+        {itemId ? (
+          <>
+            <IconButton label={completed ? 'Reopen' : 'Complete'} size={13} color={t.textSecondary} onPress={() => toggleComplete(itemId)} />
+            <IconButton label="Delete" size={13} color={t.danger} onPress={remove} />
+          </>
+        ) : null}
+      </View>
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 60 }} keyboardShouldPersistTaps="handled">
+        <View style={styles.titleRow}>
+          <Pressable
+            onPress={() => itemId && toggleComplete(itemId)}
+            style={[styles.check, { borderColor: priority ? PRIORITIES.find(p => p.value === priority)!.color : t.check, backgroundColor: completed ? t.check : 'transparent' }]}>
+            {completed ? <Text style={styles.tick}>✓</Text> : null}
+          </Pressable>
+          <TextInput
+            placeholder="What needs to be done?"
+            placeholderTextColor={t.muted}
+            value={title}
+            onChangeText={mark(setTitle)}
+            style={[styles.title, { color: t.text, textDecorationLine: completed ? 'line-through' : 'none' }]}
+            autoFocus={!existing}
+          />
+        </View>
         <TextInput
-          placeholder="Title"
-          placeholderTextColor={t.muted}
-          value={title}
-          onChangeText={mark(setTitle)}
-          style={[styles.title, { color: t.text }]}
-          autoFocus={!existing}
-        />
-        <TextInput
-          placeholder="Write your note…"
+          placeholder="Notes"
           placeholderTextColor={t.muted}
           value={body}
           onChangeText={mark(setBody)}
@@ -145,16 +167,16 @@ export function EditorScreen({ target }: { target: NonNullable<EditorTarget> }) 
           style={[styles.body, { color: t.text }]}
         />
 
-        <View style={[styles.section, { backgroundColor: t.card, borderColor: t.border }]}>
+        <View style={[styles.section, { backgroundColor: t.pane }]}>
           <View style={styles.switchRow}>
-            <Text style={[styles.label, { color: t.text }]}>⏰ Remind me</Text>
+            <Text style={[styles.label, { color: t.text }]}>⏰ Date & alarm</Text>
             <Switch value={remind} onValueChange={mark(setRemind)} />
           </View>
           {remind ? (
             <>
               <View style={{ flexDirection: 'row', gap: 10, marginTop: 10 }}>
-                <Input value={date} onChangeText={mark(setDate)} placeholder="YYYY-MM-DD" style={{ flex: 3 }} autoCapitalize="none" />
-                <Input value={time} onChangeText={mark(setTime)} placeholder="HH:MM" style={{ flex: 2 }} autoCapitalize="none" />
+                <Input value={date} onChangeText={mark(setDate)} placeholder="YYYY-MM-DD" style={{ flex: 3, backgroundColor: t.card }} autoCapitalize="none" />
+                <Input value={time} onChangeText={mark(setTime)} placeholder="HH:MM" style={{ flex: 2, backgroundColor: t.card }} autoCapitalize="none" />
               </View>
               {dateInvalid ? <Text style={{ color: t.danger, marginTop: 6, fontSize: 12 }}>Use YYYY-MM-DD and 24h HH:MM</Text> : null}
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginTop: 10 }}>
@@ -181,17 +203,23 @@ export function EditorScreen({ target }: { target: NonNullable<EditorTarget> }) 
           ) : null}
         </View>
 
-        <View style={[styles.section, { backgroundColor: t.card, borderColor: t.border }]}>
-          <View style={styles.switchRow}>
-            <Text style={[styles.label, { color: t.text }]}>📌 Pin note</Text>
-            <Switch value={pinned} onValueChange={mark(setPinned)} />
+        <View style={[styles.section, { backgroundColor: t.pane }]}>
+          <Text style={[styles.sublabel, { color: t.muted, marginTop: 0 }]}>Priority</Text>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
+            {PRIORITIES.map(p => (
+              <Chip key={p.value} label={`⚑ ${p.label}`} color={p.color} active={priority === p.value} onPress={() => mark(setPriority)(p.value)} />
+            ))}
           </View>
           <Text style={[styles.sublabel, { color: t.muted }]}>List</Text>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
-            <Chip label="None" active={listId === null} onPress={() => mark(setListId)(null)} />
+            <Chip label="Inbox" active={listId === null} onPress={() => mark(setListId)(null)} />
             {lists.map(l => (
               <Chip key={l.id} label={l.name} color={l.color} active={listId === l.id} onPress={() => mark(setListId)(l.id)} />
             ))}
+          </View>
+          <View style={[styles.switchRow, { marginTop: 8 }]}>
+            <Text style={[styles.label, { color: t.text }]}>📌 Pin in Notes</Text>
+            <Switch value={pinned} onValueChange={mark(setPinned)} />
           </View>
         </View>
       </ScrollView>
@@ -212,10 +240,14 @@ function addDays(d: Date, n: number): Date {
 }
 
 const styles = StyleSheet.create({
-  title: { fontSize: 24, fontWeight: '700', paddingVertical: 8 },
-  body: { fontSize: 17, lineHeight: 24, minHeight: 160, paddingVertical: 8 },
-  section: { borderRadius: 12, borderWidth: StyleSheet.hairlineWidth, padding: 14, marginTop: 14 },
+  header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, paddingTop: 10, paddingBottom: 6, borderBottomWidth: StyleSheet.hairlineWidth },
+  titleRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  check: { width: 20, height: 20, borderRadius: 5, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
+  tick: { color: '#fff', fontSize: 12, fontWeight: '700', lineHeight: 14 },
+  title: { flex: 1, fontSize: 20, fontWeight: '600', paddingVertical: 8 },
+  body: { fontSize: 15, lineHeight: 22, minHeight: 120, paddingVertical: 8, paddingLeft: 30 },
+  section: { borderRadius: 12, padding: 14, marginTop: 14 },
   switchRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  label: { fontSize: 16, fontWeight: '600' },
-  sublabel: { fontSize: 12, fontWeight: '600', textTransform: 'uppercase', marginTop: 12, marginBottom: 8 },
+  label: { fontSize: 15, fontWeight: '600' },
+  sublabel: { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 12, marginBottom: 8 },
 });

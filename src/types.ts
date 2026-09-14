@@ -1,4 +1,5 @@
 export type RepeatRule = 'none' | 'hourly' | 'daily' | 'weekly' | 'monthly' | 'yearly';
+export type AlertType = 'notification' | 'alarm';
 
 export interface List {
   id: string;
@@ -18,6 +19,7 @@ export interface Item {
   body: string;
   due_at: string | null;
   repeat_rule: RepeatRule;
+  alert_type: AlertType;
   is_completed: boolean;
   completed_at: string | null;
   is_pinned: boolean;
@@ -25,8 +27,7 @@ export interface Item {
   updated_at: string;
 }
 
-export type Tab = 'notes' | 'reminders' | 'lists' | 'settings';
-export type ReminderFilter = 'today' | 'scheduled' | 'all' | 'done';
+export type View = { kind: 'all' } | { kind: 'reminders' } | { kind: 'folder'; id: string } | { kind: 'settings' };
 
 export const REPEAT_RULES: RepeatRule[] = ['none', 'hourly', 'daily', 'weekly', 'monthly', 'yearly'];
-export const LIST_COLORS = ['#3b82f6', '#ef4444', '#f59e0b', '#10b981', '#8b5cf6', '#ec4899', '#14b8a6', '#6b7280'];
+export const LIST_COLORS = ['#f7b500', '#ff3b30', '#ff9500', '#34c759', '#007aff', '#5856d6', '#af52de', '#ff2d55', '#8e8e93'];

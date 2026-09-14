@@ -2,9 +2,9 @@ import { useMemo } from 'react';
 import { create } from 'zustand';
 import type { RealtimeChannel, Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
-import { alarms, DEFAULT_ACTION, DISMISS_ACTION, type NotificationActionEvent } from '../lib/alarms';
+import { alarms, DEFAULT_ACTION, DISMISS_ACTION, type AlarmFiredEvent, type NotificationActionEvent } from '../lib/alarms';
 import { nextOccurrence, SNOOZE_SUFFIX } from '../lib/schedule';
-import type { Item, List, ReminderFilter, RepeatRule, Tab } from '../types';
+import type { Item, List, RepeatRule, View } from '../types';
 
 export type EditorTarget = { kind: 'existing'; id: string } | { kind: 'new'; listId: string | null; asReminder: boolean } | null;
 
@@ -15,24 +15,29 @@ interface State {
   error: string | null;
   items: Record<string, Item>;
   lists: Record<string, List>;
-  tab: Tab;
-  reminderFilter: ReminderFilter;
+  view: View;
   search: string;
   editor: EditorTarget;
-  activeListId: string | null;
   permissionGranted: boolean | null;
+  alarmPermission: boolean | null;
+  nativeAlarms: boolean;
+  activeAlarm: AlarmFiredEvent | null;
+  mobileFolders: boolean;
 
   init(): Promise<void>;
   signIn(email: string, password: string): Promise<void>;
   signUp(email: string, password: string): Promise<string | null>;
   signOut(): Promise<void>;
   loadAll(): Promise<void>;
-  setTab(tab: Tab): void;
-  setReminderFilter(filter: ReminderFilter): void;
+  setView(view: View): void;
   setSearch(search: string): void;
   openEditor(target: EditorTarget): void;
   closeEditor(): void;
-  setActiveList(id: string | null): void;
+  setMobileFolders(open: boolean): void;
+  onAlarmFired(event: AlarmFiredEvent): void;
+  dismissAlarm(): void;
+  snoozeAlarm(minutes: number): Promise<void>;
+  requestAlarmPermission(): Promise<void>;
   createItem(input: Partial<Item>): Promise<Item | null>;
   updateItem(id: string, patch: Partial<Item>): Promise<void>;
   deleteItem(id: string): Promise<void>;
@@ -92,12 +97,14 @@ export const useStore = create<State>((set, get) => ({
   error: null,
   items: {},
   lists: {},
-  tab: 'reminders',
-  reminderFilter: 'today',
+  view: { kind: 'all' },
   search: '',
   editor: null,
-  activeListId: null,
   permissionGranted: null,
+  alarmPermission: null,
+  nativeAlarms: false,
+  activeAlarm: null,
+  mobileFolders: true,
 
   async init() {
     const { data } = await supabase.auth.getSession();
@@ -112,7 +119,7 @@ export const useStore = create<State>((set, get) => ({
         }
         if (!session) {
           teardownRealtime();
-          set({ items: {}, lists: {}, editor: null, activeListId: null });
+          set({ items: {}, lists: {}, editor: null, view: { kind: 'all' }, activeAlarm: null });
           alarms.cancelAll();
           resetReady();
         }
@@ -123,6 +130,13 @@ export const useStore = create<State>((set, get) => ({
     }
     markReady();
     alarms.requestPermission().then(granted => set({ permissionGranted: granted })).catch(() => set({ permissionGranted: false }));
+    alarms.nativeAlarmsSupported().then(nativeAlarms => set({ nativeAlarms })).catch(() => set({ nativeAlarms: false }));
+  },
+
+  async requestAlarmPermission() {
+    const granted = await alarms.requestAlarmPermission().catch(() => false);
+    set({ alarmPermission: granted });
+    scheduleSync(get);
   },
 
   async signIn(email, password) {
@@ -166,12 +180,24 @@ export const useStore = create<State>((set, get) => ({
     scheduleSync(get);
   },
 
-  setTab: tab => set({ tab, editor: null }),
-  setReminderFilter: reminderFilter => set({ reminderFilter }),
+  setView: view => set({ view, editor: null, search: '', mobileFolders: false }),
   setSearch: search => set({ search }),
   openEditor: editor => set({ editor }),
   closeEditor: () => set({ editor: null }),
-  setActiveList: activeListId => set({ activeListId }),
+  setMobileFolders: mobileFolders => set({ mobileFolders }),
+  onAlarmFired: event => set({ activeAlarm: event }),
+  dismissAlarm: () => {
+    alarms.stopAlarmSound();
+    set({ activeAlarm: null });
+  },
+  async snoozeAlarm(minutes) {
+    const active = get().activeAlarm;
+    alarms.stopAlarmSound();
+    set({ activeAlarm: null });
+    if (active) {
+      await get().snooze(active.itemId, minutes);
+    }
+  },
 
   async createItem(input) {
     const session = get().session;
@@ -253,7 +279,7 @@ export const useStore = create<State>((set, get) => ({
       await get().updateItem(id, { due_at: fireAt.toISOString() });
       return;
     }
-    await alarms.scheduleOnce(id + SNOOZE_SUFFIX, id, item.title || 'Reminder', item.body, fireAt);
+    await alarms.scheduleOnce(id + SNOOZE_SUFFIX, id, item.title || 'Reminder', item.body, fireAt, item.alert_type);
   },
 
   async createList(name, color) {
@@ -294,7 +320,7 @@ export const useStore = create<State>((set, get) => ({
           items[item.id] = { ...item, list_id: null };
         }
       }
-      return { lists, items, activeListId: s.activeListId === id ? null : s.activeListId };
+      return { lists, items, view: s.view.kind === 'folder' && s.view.id === id ? { kind: 'all' } : s.view };
     });
     const { error } = await supabase.from('lists').delete().eq('id', id);
     if (error && prev) {
@@ -326,7 +352,7 @@ export const useStore = create<State>((set, get) => ({
           break;
         case DEFAULT_ACTION:
           if (get().items[itemId]) {
-            set({ tab: 'reminders', editor: { kind: 'existing', id: itemId } });
+            set({ view: { kind: 'reminders' }, editor: { kind: 'existing', id: itemId }, mobileFolders: false });
           }
           break;
         default:

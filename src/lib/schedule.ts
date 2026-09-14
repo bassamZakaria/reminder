@@ -1,4 +1,4 @@
-import type { Item, RepeatRule } from '../types';
+import type { AlertType, Item, RepeatRule } from '../types';
 
 export const SNOOZE_SUFFIX = ':snooze';
 
@@ -55,6 +55,7 @@ export interface ScheduleRequest {
   body: string;
   fireAt: number;
   repeat: RepeatRule;
+  alertType: AlertType;
 }
 
 export function desiredSchedules(items: Item[], now: Date): ScheduleRequest[] {
@@ -81,13 +82,14 @@ export function desiredSchedules(items: Item[], now: Date): ScheduleRequest[] {
       body: firstLine(item.body),
       fireAt: fireAt.getTime(),
       repeat: firstOccurrencePending ? 'none' : item.repeat_rule,
+      alertType: item.alert_type,
     });
   }
   return out;
 }
 
 export function signature(req: ScheduleRequest): string {
-  return `${req.fireAt}|${req.repeat}|${req.title}|${req.body}`;
+  return `${req.fireAt}|${req.repeat}|${req.alertType}|${req.title}|${req.body}`;
 }
 
 export function firstLine(text: string): string {

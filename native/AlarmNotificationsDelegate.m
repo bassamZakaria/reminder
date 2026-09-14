@@ -1,7 +1,15 @@
 #import "AlarmNotificationsDelegate.h"
 #import "AlarmNotifications.h"
+#import <TargetConditionals.h>
+#if TARGET_OS_OSX
+#import <AppKit/AppKit.h>
+#endif
 
-@implementation AlarmNotificationsDelegate
+@implementation AlarmNotificationsDelegate {
+#if TARGET_OS_OSX
+  NSSound *_sound;
+#endif
+}
 
 + (instancetype)shared {
   static AlarmNotificationsDelegate *instance;
@@ -9,6 +17,7 @@
   dispatch_once(&once, ^{
     instance = [AlarmNotificationsDelegate new];
     instance.pendingActions = [NSMutableArray new];
+    instance.pendingAlarms = [NSMutableArray new];
     instance.completionHandlers = [NSMutableDictionary new];
   });
   return instance;
@@ -22,14 +31,42 @@
 - (void)userNotificationCenter:(UNUserNotificationCenter *)center
        willPresentNotification:(UNNotification *)notification
          withCompletionHandler:(void (^)(UNNotificationPresentationOptions))completionHandler {
+  NSDictionary *info = notification.request.content.userInfo;
+  if ([info[@"alertType"] isEqualToString:@"alarm"]) {
+    NSDictionary *event = @{ @"itemId": info[@"itemId"] ?: @"", @"title": notification.request.content.title ?: @"", @"body": notification.request.content.body ?: @"" };
+    [self startAlarmSound];
+#if TARGET_OS_OSX
+    [NSApp activateIgnoringOtherApps:YES];
+#endif
+    if (self.module) {
+      [self.module emitAlarm:event];
+    } else {
+      [self.pendingAlarms addObject:event];
+    }
+    completionHandler(UNNotificationPresentationOptionList);
+    return;
+  }
   completionHandler(UNNotificationPresentationOptionBanner | UNNotificationPresentationOptionList | UNNotificationPresentationOptionSound);
 }
 
 - (void)userNotificationCenter:(UNUserNotificationCenter *)center
 didReceiveNotificationResponse:(UNNotificationResponse *)response
          withCompletionHandler:(void (^)(void))completionHandler {
-  NSString *itemId = response.notification.request.content.userInfo[@"itemId"] ?: response.notification.request.identifier;
+  NSDictionary *info = response.notification.request.content.userInfo;
+  NSString *itemId = info[@"itemId"] ?: response.notification.request.identifier;
   if ([response.actionIdentifier isEqualToString:UNNotificationDismissActionIdentifier]) {
+    completionHandler();
+    return;
+  }
+  if ([info[@"alertType"] isEqualToString:@"alarm"] && [response.actionIdentifier isEqualToString:UNNotificationDefaultActionIdentifier]) {
+    // App was not running when the alarm-type notification fired: open it as a ringing alarm.
+    NSDictionary *event = @{ @"itemId": itemId, @"title": response.notification.request.content.title ?: @"", @"body": response.notification.request.content.body ?: @"" };
+    [self startAlarmSound];
+    if (self.module) {
+      [self.module emitAlarm:event];
+    } else {
+      [self.pendingAlarms addObject:event];
+    }
     completionHandler();
     return;
   }
@@ -56,6 +93,29 @@ didReceiveNotificationResponse:(UNNotificationResponse *)response
       handler();
     }
   });
+}
+
+- (void)startAlarmSound {
+#if TARGET_OS_OSX
+  dispatch_async(dispatch_get_main_queue(), ^{
+    if (self->_sound.isPlaying) {
+      return;
+    }
+    self->_sound = [NSSound soundNamed:@"Sosumi"];
+    self->_sound.loops = YES;
+    self->_sound.volume = 1.0;
+    [self->_sound play];
+  });
+#endif
+}
+
+- (void)stopAlarmSound {
+#if TARGET_OS_OSX
+  dispatch_async(dispatch_get_main_queue(), ^{
+    [self->_sound stop];
+    self->_sound = nil;
+  });
+#endif
 }
 
 @end

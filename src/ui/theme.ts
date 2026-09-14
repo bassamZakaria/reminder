@@ -5,46 +5,61 @@ export const isMac = Platform.OS === 'macos';
 export interface Theme {
   dark: boolean;
   bg: string;
+  pane: string;
   card: string;
-  cardAlt: string;
+  hover: string;
+  selected: string;
   text: string;
+  textSecondary: string;
   muted: string;
   border: string;
   accent: string;
+  accentSoft: string;
   danger: string;
+  success: string;
   sidebar: string;
-  sidebarActive: string;
   input: string;
+  check: string;
 }
 
 const light: Theme = {
   dark: false,
-  bg: '#f2f2f7',
+  bg: '#ffffff',
+  pane: '#f6f7f9',
   card: '#ffffff',
-  cardAlt: '#f9f9fb',
-  text: '#111114',
-  muted: '#7a7a82',
-  border: '#e2e2e8',
-  accent: '#ff9f0a',
-  danger: '#ff3b30',
-  sidebar: '#ebebf0',
-  sidebarActive: '#d9d9e0',
-  input: '#ffffff',
+  hover: '#f2f3f5',
+  selected: '#e8eefc',
+  text: '#191f28',
+  textSecondary: '#5b6472',
+  muted: '#9aa3ae',
+  border: '#e6e8ec',
+  accent: '#4772fa',
+  accentSoft: '#e8eefc',
+  danger: '#e53935',
+  success: '#2fb344',
+  sidebar: '#f6f7f9',
+  input: '#f2f3f5',
+  check: '#c4c9d1',
 };
 
 const dark: Theme = {
   dark: true,
-  bg: '#000000',
-  card: '#1c1c1e',
-  cardAlt: '#2c2c2e',
-  text: '#f5f5f7',
-  muted: '#8e8e93',
-  border: '#2c2c2e',
-  accent: '#ffb340',
-  danger: '#ff453a',
-  sidebar: '#141416',
-  sidebarActive: '#2a2a2e',
-  input: '#1c1c1e',
+  bg: '#191919',
+  pane: '#202020',
+  card: '#242424',
+  hover: '#2a2a2a',
+  selected: '#2c3550',
+  text: '#f0f0f0',
+  textSecondary: '#b0b4bb',
+  muted: '#7a7f88',
+  border: '#303030',
+  accent: '#5b83ff',
+  accentSoft: '#26325a',
+  danger: '#ff5c5c',
+  success: '#4cd964',
+  sidebar: '#1e1e1e',
+  input: '#2a2a2a',
+  check: '#4a4f58',
 };
 
 export function useTheme(): Theme {

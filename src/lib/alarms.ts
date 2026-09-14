@@ -1,15 +1,17 @@
 import { NativeEventEmitter, NativeModules, Platform } from 'react-native';
-import type { RepeatRule } from '../types';
+import type { AlertType, Item, RepeatRule } from '../types';
 import { desiredSchedules, signature, SNOOZE_SUFFIX, type ScheduleRequest } from './schedule';
-import type { Item } from '../types';
 
 interface NativeAlarms {
   requestPermission(): Promise<boolean>;
-  schedule(identifier: string, itemId: string, title: string, body: string, fireAt: number, repeat: RepeatRule): Promise<void>;
+  requestAlarmPermission(): Promise<boolean>;
+  alarmsSupported(): Promise<boolean>;
+  schedule(identifier: string, itemId: string, title: string, body: string, fireAt: number, repeat: RepeatRule, alertType: AlertType): Promise<void>;
   cancel(identifiers: string[]): void;
   cancelAll(): void;
   getPending(): Promise<string[]>;
   ackAction(eventId: string): void;
+  stopAlarmSound(): void;
   addListener(event: string): void;
   removeListeners(count: number): void;
 }
@@ -20,38 +22,67 @@ export interface NotificationActionEvent {
   itemId: string;
   action: NotificationAction;
 }
+export interface AlarmFiredEvent {
+  itemId: string;
+  title: string;
+  body: string;
+}
 export const DEFAULT_ACTION = 'com.apple.UNNotificationDefaultActionIdentifier';
 export const DISMISS_ACTION = 'com.apple.UNNotificationDismissActionIdentifier';
 
 const native: NativeAlarms | undefined = NativeModules.AlarmNotifications;
 const supported = (Platform.OS === 'ios' || Platform.OS === 'macos') && !!native;
+const emitter = supported ? new NativeEventEmitter(native as never) : null;
 
 const scheduled = new Map<string, string>();
 
 export const alarms = {
   supported,
+  isMac: Platform.OS === 'macos',
 
   async requestPermission(): Promise<boolean> {
-    if (!supported) {
-      return false;
-    }
-    return native!.requestPermission();
+    return supported ? native!.requestPermission() : false;
+  },
+
+  async requestAlarmPermission(): Promise<boolean> {
+    return supported ? native!.requestAlarmPermission() : false;
+  },
+
+  async nativeAlarmsSupported(): Promise<boolean> {
+    return supported ? native!.alarmsSupported() : false;
   },
 
   onAction(handler: (event: NotificationActionEvent) => void): () => void {
-    if (!supported) {
+    if (!emitter) {
       return () => {};
     }
-    const emitter = new NativeEventEmitter(native as never);
     const sub = emitter.addListener('notificationAction', handler);
     return () => sub.remove();
   },
 
-  async scheduleOnce(identifier: string, itemId: string, title: string, body: string, fireAt: Date): Promise<void> {
+  onAlarmFired(handler: (event: AlarmFiredEvent) => void): () => void {
+    if (!emitter) {
+      return () => {};
+    }
+    const sub = emitter.addListener('alarmFired', handler);
+    return () => sub.remove();
+  },
+
+  stopAlarmSound() {
+    if (supported) {
+      native!.stopAlarmSound();
+    }
+  },
+
+  async scheduleOnce(identifier: string, itemId: string, title: string, body: string, fireAt: Date, alertType: AlertType): Promise<void> {
     if (!supported) {
       return;
     }
-    await native!.schedule(identifier, itemId, title, body, fireAt.getTime(), 'none');
+    await native!.schedule(identifier, itemId, title, body, fireAt.getTime(), 'none', alertType);
+  },
+
+  async pendingIds(): Promise<string[]> {
+    return supported ? native!.getPending() : [];
   },
 
   cancel(identifiers: string[]) {
@@ -62,19 +93,11 @@ export const alarms = {
     identifiers.forEach(id => scheduled.delete(id));
   },
 
-  async pendingIds(): Promise<string[]> {
-    if (!supported) {
-      return [];
-    }
-    return native!.getPending();
-  },
-
   cancelAll() {
     scheduled.clear();
-    if (!supported) {
-      return;
+    if (supported) {
+      native!.cancelAll();
     }
-    native!.cancelAll();
   },
 
   ackAction(eventId: string) {
@@ -108,5 +131,5 @@ export const alarms = {
 };
 
 async function scheduleRequest(req: ScheduleRequest) {
-  await native!.schedule(req.identifier, req.itemId, req.title, req.body, req.fireAt, req.repeat);
+  await native!.schedule(req.identifier, req.itemId, req.title, req.body, req.fireAt, req.repeat, req.alertType);
 }

@@ -1,65 +1,93 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useStore } from '../store/useStore';
-import type { Tab } from '../types';
+import { CalendarScreen } from './CalendarScreen';
+import { IconButton } from './common';
 import { EditorScreen } from './EditorScreen';
-import { ListsScreen } from './ListsScreen';
 import { NotesScreen } from './NotesScreen';
-import { RemindersScreen } from './RemindersScreen';
 import { SettingsScreen } from './SettingsScreen';
+import { Sidebar } from './Sidebar';
+import { TaskList } from './TaskList';
 import { isMac, useTheme } from './theme';
-
-const TABS: { value: Tab; label: string; icon: string }[] = [
-  { value: 'reminders', label: 'Reminders', icon: '⏰' },
-  { value: 'notes', label: 'Notes', icon: '📝' },
-  { value: 'lists', label: 'Lists', icon: '📂' },
-  { value: 'settings', label: 'Settings', icon: '⚙️' },
-];
 
 export function Shell() {
   const t = useTheme();
-  const tab = useStore(s => s.tab);
-  const setTab = useStore(s => s.setTab);
+  const view = useStore(s => s.view);
+  const setView = useStore(s => s.setView);
   const editor = useStore(s => s.editor);
+  const openEditor = useStore(s => s.openEditor);
+  const [drawer, setDrawer] = useState(false);
 
-  const content = tab === 'notes' ? <NotesScreen /> : tab === 'lists' ? <ListsScreen /> : tab === 'settings' ? <SettingsScreen /> : <RemindersScreen />;
+  const menuButton = isMac ? undefined : <IconButton label="☰" size={20} color={t.textSecondary} onPress={() => setDrawer(true)} />;
+  const content =
+    view.kind === 'notes' ? (
+      <NotesScreen headerLeft={menuButton} />
+    ) : view.kind === 'calendar' ? (
+      <CalendarScreen headerLeft={menuButton} />
+    ) : view.kind === 'settings' ? (
+      <SettingsScreen headerLeft={menuButton} />
+    ) : (
+      <TaskList headerLeft={menuButton} />
+    );
 
   if (isMac) {
     return (
       <View style={{ flex: 1, flexDirection: 'row', backgroundColor: t.bg }}>
-        <View style={[styles.sidebar, { backgroundColor: t.sidebar, borderRightColor: t.border }]}>
-          <Text style={[styles.brand, { color: t.text }]}>Recall</Text>
-          {TABS.map(item => (
-            <Pressable key={item.value} onPress={() => setTab(item.value)} style={[styles.sideItem, tab === item.value && { backgroundColor: t.sidebarActive }]}>
-              <Text style={{ fontSize: 15 }}>{item.icon}</Text>
-              <Text style={{ color: t.text, fontSize: 14, fontWeight: tab === item.value ? '600' : '400', marginLeft: 10 }}>{item.label}</Text>
-            </Pressable>
-          ))}
-        </View>
-        <View style={{ flex: 1 }}>{content}</View>
-        {editor ? (
-          <View style={[styles.macEditor, { backgroundColor: t.bg, borderLeftColor: t.border }]}>
-            <EditorScreen key={editorKey(editor)} target={editor} />
+        <Sidebar />
+        <View style={{ flex: 1, minWidth: 320 }}>{content}</View>
+        {view.kind !== 'settings' ? (
+          <View style={[styles.detail, { backgroundColor: t.bg, borderLeftColor: t.border }]}>
+            {editor ? (
+              <EditorScreen key={editorKey(editor)} target={editor} />
+            ) : (
+              <View style={styles.placeholder}>
+                <Text style={{ fontSize: 40, marginBottom: 8 }}>🗒️</Text>
+                <Text style={{ color: t.muted, fontSize: 13 }}>Click a task to view details</Text>
+              </View>
+            )}
           </View>
         ) : null}
       </View>
     );
   }
 
+  const tabActive = (kind: string) => (kind === 'tasks' ? view.kind === 'smart' || view.kind === 'list' : view.kind === kind);
+  const tabs = [
+    { key: 'tasks', icon: '☑︎', label: 'Tasks', go: () => setView({ kind: 'smart', id: 'today' }) },
+    { key: 'calendar', icon: '🗓', label: 'Calendar', go: () => setView({ kind: 'calendar' }) },
+    { key: 'notes', icon: '📝', label: 'Notes', go: () => setView({ kind: 'notes' }) },
+    { key: 'settings', icon: '⚙︎', label: 'Settings', go: () => setView({ kind: 'settings' }) },
+  ];
+
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: t.bg }} edges={['top', 'left', 'right']}>
       <View style={{ flex: 1 }}>{content}</View>
+      {view.kind === 'smart' || view.kind === 'list' ? (
+        <Pressable
+          onPress={() => openEditor({ kind: 'new', listId: view.kind === 'list' ? view.id : null, asReminder: false })}
+          style={({ pressed }) => [styles.fab, { backgroundColor: t.accent, opacity: pressed ? 0.8 : 1 }]}>
+          <Text style={{ color: '#fff', fontSize: 28, lineHeight: 30 }}>＋</Text>
+        </Pressable>
+      ) : null}
       <SafeAreaView edges={['bottom']} style={[styles.tabBar, { backgroundColor: t.card, borderTopColor: t.border }]}>
         <View style={{ flexDirection: 'row' }}>
-          {TABS.map(item => (
-            <Pressable key={item.value} onPress={() => setTab(item.value)} style={styles.tabItem}>
-              <Text style={{ fontSize: 20, opacity: tab === item.value ? 1 : 0.5 }}>{item.icon}</Text>
-              <Text style={{ color: tab === item.value ? t.accent : t.muted, fontSize: 11, marginTop: 2 }}>{item.label}</Text>
+          {tabs.map(item => (
+            <Pressable key={item.key} onPress={item.go} style={styles.tabItem}>
+              <Text style={{ fontSize: 20, color: tabActive(item.key) ? t.accent : t.muted }}>{item.icon}</Text>
+              <Text style={{ color: tabActive(item.key) ? t.accent : t.muted, fontSize: 11, marginTop: 2 }}>{item.label}</Text>
             </Pressable>
           ))}
         </View>
       </SafeAreaView>
+      <Modal visible={drawer} animationType="slide" transparent onRequestClose={() => setDrawer(false)}>
+        <View style={{ flex: 1, flexDirection: 'row' }}>
+          <SafeAreaView style={{ width: 280 }}>
+            <Sidebar showBrand onNavigate={() => setDrawer(false)} />
+          </SafeAreaView>
+          <Pressable style={styles.scrim} onPress={() => setDrawer(false)} />
+        </View>
+      </Modal>
       <Modal visible={!!editor} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => useStore.getState().closeEditor()}>
         {editor ? (
           <SafeAreaView style={{ flex: 1, backgroundColor: t.bg }} edges={['bottom']}>
@@ -72,14 +100,14 @@ export function Shell() {
 }
 
 function editorKey(editor: NonNullable<ReturnType<typeof useStore.getState>['editor']>): string {
-  return editor.kind === 'existing' ? editor.id : `new-${editor.listId ?? ''}-${editor.asReminder}`;
+  return editor.kind === 'existing' ? editor.id : `new-${editor.listId ?? ''}-${editor.asReminder}-${editor.dueAt ?? ''}`;
 }
 
 const styles = StyleSheet.create({
-  sidebar: { width: 200, paddingTop: 40, paddingHorizontal: 10, borderRightWidth: StyleSheet.hairlineWidth },
-  brand: { fontSize: 18, fontWeight: '800', paddingHorizontal: 10, marginBottom: 14 },
-  sideItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8, paddingHorizontal: 10, borderRadius: 8, marginBottom: 2 },
-  macEditor: { width: 420, borderLeftWidth: StyleSheet.hairlineWidth },
+  detail: { width: 380, borderLeftWidth: StyleSheet.hairlineWidth },
+  placeholder: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   tabBar: { borderTopWidth: StyleSheet.hairlineWidth },
   tabItem: { flex: 1, alignItems: 'center', paddingVertical: 8 },
+  fab: { position: 'absolute', right: 20, bottom: 76, width: 54, height: 54, borderRadius: 27, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOpacity: 0.25, shadowRadius: 6, shadowOffset: { width: 0, height: 3 } },
+  scrim: { flex: 1, backgroundColor: 'rgba(0,0,0,0.35)' },
 });

@@ -18,6 +18,7 @@ export function AuthScreen() {
   return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={[styles.wrap, { backgroundColor: t.bg }]}>
       <View style={[styles.card, { backgroundColor: t.card, borderColor: t.border }]}>
+        <View style={[styles.logo, { backgroundColor: t.accent }]}><Text style={{ color: '#fff', fontSize: 22, fontWeight: '800' }}>✓</Text></View>
         <Text style={[styles.title, { color: t.text }]}>Recall</Text>
         <Text style={{ color: t.muted, marginBottom: 20 }}>Notes and reminders, synced across your devices.</Text>
         {!isConfigured ? (
@@ -42,6 +43,7 @@ export function AuthScreen() {
 
 const styles = StyleSheet.create({
   wrap: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 20 },
-  card: { width: '100%', maxWidth: 380, padding: 22, borderRadius: 16, borderWidth: StyleSheet.hairlineWidth },
+  card: { width: '100%', maxWidth: 380, padding: 22, borderRadius: 16, borderWidth: 1 },
   title: { fontSize: 30, fontWeight: '800', marginBottom: 4 },
+  logo: { width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginBottom: 12 },
 });
