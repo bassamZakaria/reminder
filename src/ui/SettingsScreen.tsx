@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { alarms } from '../lib/alarms';
 import { useStore } from '../store/useStore';
@@ -12,6 +12,23 @@ export function SettingsScreen() {
   const loadAll = useStore(s => s.loadAll);
   const permission = useStore(s => s.permissionGranted);
   const itemCount = useStore(s => Object.keys(s.items).length);
+  const items = useStore(s => s.items);
+  const [pending, setPending] = useState<string[] | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      alarms.pendingIds().then(ids => {
+        if (!cancelled) {
+          setPending(ids);
+        }
+      });
+    }, 400);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [items]);
 
   return (
     <View style={{ flex: 1, backgroundColor: t.bg }}>
@@ -20,6 +37,7 @@ export function SettingsScreen() {
         <Row label="Account" value={session?.user.email ?? '—'} />
         <Row label="Items synced" value={String(itemCount)} />
         <Row label="Notifications" value={!alarms.supported ? 'Unsupported' : permission == null ? 'Checking…' : permission ? 'Allowed' : 'Denied (enable in System Settings)'} />
+        <Row label="Alarms scheduled on this device" value={pending == null ? '…' : String(pending.length)} />
       </View>
       <View style={{ padding: 16, gap: 10 }}>
         <Button title="Refresh from cloud" kind="ghost" onPress={() => loadAll()} />

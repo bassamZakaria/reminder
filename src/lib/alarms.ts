@@ -62,6 +62,13 @@ export const alarms = {
     identifiers.forEach(id => scheduled.delete(id));
   },
 
+  async pendingIds(): Promise<string[]> {
+    if (!supported) {
+      return [];
+    }
+    return native!.getPending();
+  },
+
   cancelAll() {
     scheduled.clear();
     if (!supported) {
