@@ -1,6 +1,6 @@
 import { NativeEventEmitter, NativeModules, Platform } from 'react-native';
 import type { RepeatRule } from '../types';
-import { desiredSchedules, signature, type ScheduleRequest } from './schedule';
+import { desiredSchedules, signature, SNOOZE_SUFFIX, type ScheduleRequest } from './schedule';
 import type { Item } from '../types';
 
 interface NativeAlarms {
@@ -9,15 +9,19 @@ interface NativeAlarms {
   cancel(identifiers: string[]): void;
   cancelAll(): void;
   getPending(): Promise<string[]>;
+  ackAction(eventId: string): void;
   addListener(event: string): void;
   removeListeners(count: number): void;
 }
 
 export type NotificationAction = 'COMPLETE' | 'SNOOZE_10' | 'SNOOZE_60' | string;
 export interface NotificationActionEvent {
+  eventId?: string;
   itemId: string;
   action: NotificationAction;
 }
+export const DEFAULT_ACTION = 'com.apple.UNNotificationDefaultActionIdentifier';
+export const DISMISS_ACTION = 'com.apple.UNNotificationDismissActionIdentifier';
 
 const native: NativeAlarms | undefined = NativeModules.AlarmNotifications;
 const supported = (Platform.OS === 'ios' || Platform.OS === 'macos') && !!native;
@@ -58,6 +62,20 @@ export const alarms = {
     identifiers.forEach(id => scheduled.delete(id));
   },
 
+  cancelAll() {
+    scheduled.clear();
+    if (!supported) {
+      return;
+    }
+    native!.cancelAll();
+  },
+
+  ackAction(eventId: string) {
+    if (supported && eventId) {
+      native!.ackAction(eventId);
+    }
+  },
+
   async sync(items: Item[], now = new Date()): Promise<void> {
     if (!supported) {
       return;
@@ -65,7 +83,7 @@ export const alarms = {
     const desired = desiredSchedules(items, now);
     const desiredIds = new Set(desired.map(d => d.identifier));
     const pending = await native!.getPending();
-    const stale = pending.filter(id => !desiredIds.has(id) && !id.endsWith(':snooze'));
+    const stale = pending.filter(id => !desiredIds.has(id.endsWith(SNOOZE_SUFFIX) ? id.slice(0, -SNOOZE_SUFFIX.length) : id));
     if (stale.length) {
       native!.cancel(stale);
       stale.forEach(id => scheduled.delete(id));

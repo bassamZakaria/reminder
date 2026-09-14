@@ -2,7 +2,7 @@ import React, { useMemo } from 'react';
 import { SectionList, StyleSheet, Text, View } from 'react-native';
 import { formatDayHeading } from '../lib/dates';
 import { isSameDay, startOfDay } from '../lib/schedule';
-import { selectItems, useStore } from '../store/useStore';
+import { useItems, useStore } from '../store/useStore';
 import type { Item, ReminderFilter } from '../types';
 import { Empty, Header, IconButton, Segmented } from './common';
 import { ItemRow } from './ItemRow';
@@ -34,7 +34,7 @@ function groupByDay(items: Item[]): { title: string; data: Item[] }[] {
 
 export function RemindersScreen() {
   const t = useTheme();
-  const items = useStore(selectItems);
+  const items = useItems();
   const filter = useStore(s => s.reminderFilter);
   const setFilter = useStore(s => s.setReminderFilter);
   const openEditor = useStore(s => s.openEditor);
@@ -53,7 +53,7 @@ export function RemindersScreen() {
         filtered = items.filter(i => i.is_completed);
         break;
       default:
-        filtered = items.filter(i => !i.is_completed && i.due_at);
+        filtered = items.filter(i => !i.is_completed);
     }
     if (filter === 'done') {
       return [{ title: 'Completed', data: filtered.sort((a, b) => (b.completed_at ?? '').localeCompare(a.completed_at ?? '')) }];

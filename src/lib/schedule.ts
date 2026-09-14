@@ -17,14 +17,22 @@ export function addRepeat(date: Date, rule: RepeatRule, count = 1): Date {
       d.setDate(d.getDate() + 7 * count);
       return d;
     case 'monthly':
-      d.setMonth(d.getMonth() + count);
-      return d;
+      return addMonthsClamped(d, count);
     case 'yearly':
-      d.setFullYear(d.getFullYear() + count);
-      return d;
+      return addMonthsClamped(d, 12 * count);
     default:
       return d;
   }
+}
+
+function addMonthsClamped(d: Date, months: number): Date {
+  const day = d.getDate();
+  const x = new Date(d.getTime());
+  x.setDate(1);
+  x.setMonth(x.getMonth() + months);
+  const lastDay = new Date(x.getFullYear(), x.getMonth() + 1, 0).getDate();
+  x.setDate(Math.min(day, lastDay));
+  return x;
 }
 
 export function nextOccurrence(dueAt: Date, rule: RepeatRule, now: Date): Date {
@@ -62,14 +70,17 @@ export function desiredSchedules(items: Item[], now: Date): ScheduleRequest[] {
     if (item.repeat_rule === 'none' && due.getTime() <= now.getTime()) {
       continue;
     }
-    const fireAt = item.repeat_rule === 'none' ? due : nextOccurrence(due, item.repeat_rule, now);
+    // A calendar repeat trigger has no start date, so a future first occurrence is armed as a
+    // one-shot; once it is in the past, the next sync re-arms it as a true repeating trigger.
+    const firstOccurrencePending = item.repeat_rule !== 'none' && due.getTime() > now.getTime();
+    const fireAt = item.repeat_rule === 'none' || firstOccurrencePending ? due : nextOccurrence(due, item.repeat_rule, now);
     out.push({
       identifier: item.id,
       itemId: item.id,
       title: item.title || 'Reminder',
       body: firstLine(item.body),
       fireAt: fireAt.getTime(),
-      repeat: item.repeat_rule,
+      repeat: firstOccurrencePending ? 'none' : item.repeat_rule,
     });
   }
   return out;

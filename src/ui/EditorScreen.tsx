@@ -1,7 +1,7 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { parseDateTime, toDateInput, toTimeInput } from '../lib/dates';
-import { selectLists, useStore, type EditorTarget } from '../store/useStore';
+import { useLists, useStore, type EditorTarget } from '../store/useStore';
 import { REPEAT_RULES, type RepeatRule } from '../types';
 import { Chip, Header, IconButton, Input } from './common';
 import { useTheme } from './theme';
@@ -16,7 +16,7 @@ const QUICK: { label: string; at: () => Date }[] = [
 export function EditorScreen({ target }: { target: NonNullable<EditorTarget> }) {
   const t = useTheme();
   const existing = useStore(s => (target.kind === 'existing' ? s.items[target.id] : undefined));
-  const lists = useStore(selectLists);
+  const lists = useLists();
   const createItem = useStore(s => s.createItem);
   const updateItem = useStore(s => s.updateItem);
   const deleteItem = useStore(s => s.deleteItem);
@@ -31,8 +31,11 @@ export function EditorScreen({ target }: { target: NonNullable<EditorTarget> }) 
   const [date, setDate] = useState(initialDue ? toDateInput(initialDue) : toDateInput(new Date()));
   const [time, setTime] = useState(initialDue ? toTimeInput(initialDue) : '09:00');
   const [repeat, setRepeat] = useState<RepeatRule>(existing?.repeat_rule ?? 'none');
+  const [itemId, setItemId] = useState<string | null>(existing?.id ?? null);
   const idRef = useRef<string | null>(existing?.id ?? null);
   const dirty = useRef(false);
+  const saveChain = useRef<Promise<void>>(Promise.resolve());
+  const debounce = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const parsedDue = useMemo(() => (remind ? parseDateTime(date, time) : null), [remind, date, time]);
   const dateInvalid = remind && !parsedDue;
@@ -48,26 +51,45 @@ export function EditorScreen({ target }: { target: NonNullable<EditorTarget> }) 
     }),
     [title, body, listId, pinned, parsedDue, repeat],
   );
+  const latest = useRef(payload);
+  latest.current = payload;
+
+  // Saves run one after another so a create in flight can never be followed by a second create.
+  const save = useCallback((): Promise<void> => {
+    const run = async () => {
+      const data = latest.current;
+      if (idRef.current) {
+        await updateItem(idRef.current, data);
+        return;
+      }
+      if (!data.title && !data.body) {
+        return;
+      }
+      const created = await createItem(data);
+      if (created) {
+        idRef.current = created.id;
+        setItemId(created.id);
+      }
+    };
+    saveChain.current = saveChain.current.then(run, run);
+    return saveChain.current;
+  }, [createItem, updateItem]);
 
   useEffect(() => {
     if (!dirty.current || dateInvalid) {
       return;
     }
-    const handle = setTimeout(async () => {
-      if (!payload.title && !payload.body) {
-        return;
-      }
-      if (idRef.current) {
-        await updateItem(idRef.current, payload);
-      } else {
-        const created = await createItem(payload);
-        if (created) {
-          idRef.current = created.id;
-        }
-      }
+    debounce.current = setTimeout(() => {
+      debounce.current = null;
+      save();
     }, 500);
-    return () => clearTimeout(handle);
-  }, [payload, dateInvalid, createItem, updateItem]);
+    return () => {
+      if (debounce.current) {
+        clearTimeout(debounce.current);
+        debounce.current = null;
+      }
+    };
+  }, [payload, dateInvalid, save]);
 
   const mark = <T,>(setter: (v: T) => void) => (v: T) => {
     dirty.current = true;
@@ -75,12 +97,12 @@ export function EditorScreen({ target }: { target: NonNullable<EditorTarget> }) 
   };
 
   const done = async () => {
-    if (dirty.current && !dateInvalid && (payload.title || payload.body)) {
-      if (idRef.current) {
-        await updateItem(idRef.current, payload);
-      } else {
-        await createItem(payload);
-      }
+    if (debounce.current) {
+      clearTimeout(debounce.current);
+      debounce.current = null;
+    }
+    if (dirty.current && !dateInvalid) {
+      await save();
     }
     closeEditor();
   };
@@ -102,7 +124,7 @@ export function EditorScreen({ target }: { target: NonNullable<EditorTarget> }) 
       <Header
         title={existing ? 'Edit' : 'New'}
         left={<IconButton label="Done" onPress={done} />}
-        right={idRef.current ? <IconButton label="Delete" color={t.danger} onPress={remove} /> : undefined}
+        right={itemId ? <IconButton label="Delete" color={t.danger} onPress={remove} /> : undefined}
       />
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 60 }} keyboardShouldPersistTaps="handled">
         <TextInput

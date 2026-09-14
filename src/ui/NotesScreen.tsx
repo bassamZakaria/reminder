@@ -1,14 +1,14 @@
 import React, { useMemo } from 'react';
 import { FlatList, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { formatRelative } from '../lib/dates';
-import { selectItems, useStore } from '../store/useStore';
+import { useItems, useStore } from '../store/useStore';
 import type { Item } from '../types';
 import { Empty, Header, IconButton, Input } from './common';
 import { isMac, useTheme } from './theme';
 
 export function NotesScreen() {
   const t = useTheme();
-  const items = useStore(selectItems);
+  const items = useItems();
   const search = useStore(s => s.search);
   const setSearch = useStore(s => s.setSearch);
   const openEditor = useStore(s => s.openEditor);

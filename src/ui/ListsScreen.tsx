@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Alert, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
-import { selectItems, selectLists, useStore } from '../store/useStore';
+import { useItems, useLists, useStore } from '../store/useStore';
 import { LIST_COLORS, type List } from '../types';
 import { Button, Chip, Empty, Header, IconButton, Input } from './common';
 import { ItemRow } from './ItemRow';
@@ -8,8 +8,8 @@ import { useTheme } from './theme';
 
 export function ListsScreen() {
   const t = useTheme();
-  const lists = useStore(selectLists);
-  const items = useStore(selectItems);
+  const lists = useLists();
+  const items = useItems();
   const activeListId = useStore(s => s.activeListId);
   const setActiveList = useStore(s => s.setActiveList);
   const createList = useStore(s => s.createList);

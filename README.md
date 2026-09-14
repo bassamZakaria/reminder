@@ -8,7 +8,7 @@ Notes + Reminders in one app for iPhone and Mac. One React Native codebase (`rea
 2. `npx supabase login` (opens browser once)
 3. `USER_EMAIL=you@example.com USER_PASSWORD='choose-a-password' ./scripts/setup-supabase.sh`
    Creates the free project, applies the schema, creates your login, writes `app.config.json`.
-4. iOS: `cd ios && bundle exec pod install`; macOS: `cd macos && pod install`
+4. iOS: `cd ios && bundle exec pod install`; macOS: `cd macos && bundle exec pod install`
 
 ## Run
 

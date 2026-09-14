@@ -16,8 +16,15 @@ export function parseDateTime(date: string, time: string): Date | null {
   if (!dm || !tm) {
     return null;
   }
-  const d = new Date(Number(dm[1]), Number(dm[2]) - 1, Number(dm[3]), Number(tm[1]), Number(tm[2]), 0, 0);
-  return Number.isNaN(d.getTime()) ? null : d;
+  const [year, month, day, hour, minute] = [Number(dm[1]), Number(dm[2]), Number(dm[3]), Number(tm[1]), Number(tm[2])];
+  if (month < 1 || month > 12 || day < 1 || day > 31 || hour > 23 || minute > 59) {
+    return null;
+  }
+  const d = new Date(year, month - 1, day, hour, minute, 0, 0);
+  if (d.getMonth() !== month - 1 || d.getDate() !== day) {
+    return null;
+  }
+  return d;
 }
 
 export function formatDue(iso: string, now = new Date()): string {

@@ -32,5 +32,13 @@ target 'Recall' do
       :mac_catalyst_enabled => false,
       # :ccache_enabled => true
     )
+    # fmt 11.0.2 (pinned by react-native 0.81) fails to compile its consteval format strings with Xcode 26.6 / Clang 21.
+    # Building only the fmt library target as C++17 turns consteval off; consumers stay on C++20.
+    installer.pods_project.targets.each do |target|
+      next unless target.name == 'fmt'
+      target.build_configurations.each do |build_config|
+        build_config.build_settings['CLANG_CXX_LANGUAGE_STANDARD'] = 'c++17'
+      end
+    end
   end
 end

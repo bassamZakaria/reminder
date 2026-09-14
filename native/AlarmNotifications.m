@@ -32,7 +32,7 @@ RCT_EXPORT_MODULE();
   UNNotificationCategory *category = [UNNotificationCategory categoryWithIdentifier:kCategory
                                                                             actions:@[complete, snooze10, snooze60]
                                                                   intentIdentifiers:@[]
-                                                                            options:UNNotificationCategoryOptionCustomDismissAction];
+                                                                            options:UNNotificationCategoryOptionNone];
   [[UNUserNotificationCenter currentNotificationCenter] setNotificationCategories:[NSSet setWithObject:category]];
 }
 
@@ -111,6 +111,10 @@ RCT_EXPORT_METHOD(schedule:(NSString *)identifier
 RCT_EXPORT_METHOD(cancel:(NSArray<NSString *> *)identifiers) {
   [[UNUserNotificationCenter currentNotificationCenter] removePendingNotificationRequestsWithIdentifiers:identifiers];
   [[UNUserNotificationCenter currentNotificationCenter] removeDeliveredNotificationsWithIdentifiers:identifiers];
+}
+
+RCT_EXPORT_METHOD(ackAction:(NSString *)eventId) {
+  [[AlarmNotificationsDelegate shared] acknowledge:eventId];
 }
 
 RCT_EXPORT_METHOD(cancelAll) {

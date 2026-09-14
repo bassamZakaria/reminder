@@ -1,7 +1,8 @@
+import { useMemo } from 'react';
 import { create } from 'zustand';
 import type { RealtimeChannel, Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
-import { alarms, type NotificationActionEvent } from '../lib/alarms';
+import { alarms, DEFAULT_ACTION, DISMISS_ACTION, type NotificationActionEvent } from '../lib/alarms';
 import { nextOccurrence, SNOOZE_SUFFIX } from '../lib/schedule';
 import type { Item, List, ReminderFilter, RepeatRule, Tab } from '../types';
 
@@ -44,6 +45,26 @@ interface State {
 }
 
 let channel: RealtimeChannel | null = null;
+let channelUserId: string | null = null;
+let resolveReady: (() => void) | null = null;
+let readyPending = true;
+let ready = new Promise<void>(resolve => {
+  resolveReady = resolve;
+});
+function markReady() {
+  readyPending = false;
+  resolveReady?.();
+  resolveReady = null;
+}
+function resetReady() {
+  if (readyPending) {
+    return;
+  }
+  readyPending = true;
+  ready = new Promise<void>(resolve => {
+    resolveReady = resolve;
+  });
+}
 let syncTimer: ReturnType<typeof setTimeout> | null = null;
 
 function scheduleSync(get: () => State) {
@@ -82,20 +103,25 @@ export const useStore = create<State>((set, get) => ({
     const { data } = await supabase.auth.getSession();
     set({ session: data.session, authReady: true });
     supabase.auth.onAuthStateChange((_event, session) => {
-      const hadUser = get().session?.user.id;
-      set({ session });
-      if (session && session.user.id !== hadUser) {
-        get().loadAll();
-      }
-      if (!session) {
-        teardownRealtime();
-        set({ items: {}, lists: {} });
-        alarms.cancel([]);
-      }
+      setTimeout(() => {
+        const hadUser = get().session?.user.id;
+        set({ session });
+        if (session && session.user.id !== hadUser) {
+          resetReady();
+          get().loadAll().then(markReady);
+        }
+        if (!session) {
+          teardownRealtime();
+          set({ items: {}, lists: {}, editor: null, activeListId: null });
+          alarms.cancelAll();
+          resetReady();
+        }
+      }, 0);
     });
     if (data.session) {
       await get().loadAll();
     }
+    markReady();
     alarms.requestPermission().then(granted => set({ permissionGranted: granted })).catch(() => set({ permissionGranted: false }));
   },
 
@@ -208,6 +234,7 @@ export const useStore = create<State>((set, get) => ({
       await get().updateItem(id, { is_completed: false, completed_at: null });
       return;
     }
+    alarms.cancel([id + SNOOZE_SUFFIX]);
     if (item.repeat_rule !== 'none' && item.due_at) {
       const next = nextOccurrence(new Date(item.due_at), item.repeat_rule, new Date());
       await get().updateItem(id, { due_at: next.toISOString() });
@@ -275,24 +302,40 @@ export const useStore = create<State>((set, get) => ({
     }
   },
 
-  async handleNotificationAction({ itemId, action }) {
-    if (!get().items[itemId]) {
-      await get().loadAll();
-    }
-    switch (action) {
-      case 'COMPLETE':
-        await get().toggleComplete(itemId);
-        break;
-      case 'SNOOZE_10':
-        await get().snooze(itemId, 10);
-        break;
-      case 'SNOOZE_60':
-        await get().snooze(itemId, 60);
-        break;
-      default:
-        if (get().items[itemId]) {
-          set({ tab: 'reminders', editor: { kind: 'existing', id: itemId } });
-        }
+  async handleNotificationAction({ itemId, action, eventId }) {
+    try {
+      if (action === DISMISS_ACTION) {
+        return;
+      }
+      await ready;
+      if (!get().session) {
+        return;
+      }
+      if (!get().items[itemId]) {
+        await get().loadAll();
+      }
+      switch (action) {
+        case 'COMPLETE':
+          await get().toggleComplete(itemId);
+          break;
+        case 'SNOOZE_10':
+          await get().snooze(itemId, 10);
+          break;
+        case 'SNOOZE_60':
+          await get().snooze(itemId, 60);
+          break;
+        case DEFAULT_ACTION:
+          if (get().items[itemId]) {
+            set({ tab: 'reminders', editor: { kind: 'existing', id: itemId } });
+          }
+          break;
+        default:
+          break;
+      }
+    } finally {
+      if (eventId) {
+        alarms.ackAction(eventId);
+      }
     }
   },
 }));
@@ -301,11 +344,16 @@ function teardownRealtime() {
   if (channel) {
     supabase.removeChannel(channel);
     channel = null;
+    channelUserId = null;
   }
 }
 
 function setupRealtime(userId: string, set: (fn: (s: State) => Partial<State>) => void, get: () => State) {
+  if (channel && channelUserId === userId) {
+    return;
+  }
   teardownRealtime();
+  channelUserId = userId;
   channel = supabase
     .channel(`user-${userId}`)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'items', filter: `user_id=eq.${userId}` }, payload => {
@@ -341,4 +389,14 @@ function setupRealtime(userId: string, set: (fn: (s: State) => Partial<State>) =
 
 export const selectItems = (s: State) => Object.values(s.items);
 export const selectLists = (s: State) => Object.values(s.lists).sort((a, b) => a.sort_order - b.sort_order || a.created_at.localeCompare(b.created_at));
+
+export function useItems(): Item[] {
+  const items = useStore(s => s.items);
+  return useMemo(() => Object.values(items), [items]);
+}
+
+export function useLists(): List[] {
+  const lists = useStore(s => s.lists);
+  return useMemo(() => Object.values(lists).sort((a, b) => a.sort_order - b.sort_order || a.created_at.localeCompare(b.created_at)), [lists]);
+}
 export type { RepeatRule };

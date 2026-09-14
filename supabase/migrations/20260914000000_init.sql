@@ -26,6 +26,7 @@ create table public.items (
 );
 
 create index items_user_due_idx on public.items(user_id, due_at);
+create index items_list_idx on public.items(list_id);
 create index items_user_updated_idx on public.items(user_id, updated_at desc);
 
 create or replace function public.set_updated_at() returns trigger language plpgsql as $$
@@ -40,8 +41,8 @@ create trigger items_updated_at before update on public.items for each row execu
 alter table public.lists enable row level security;
 alter table public.items enable row level security;
 
-create policy "own lists" on public.lists for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
-create policy "own items" on public.items for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+create policy "own lists" on public.lists for all to authenticated using (auth.uid() = user_id) with check (auth.uid() = user_id);
+create policy "own items" on public.items for all to authenticated using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
 alter table public.lists replica identity full;
 alter table public.items replica identity full;
