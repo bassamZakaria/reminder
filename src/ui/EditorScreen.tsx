@@ -3,6 +3,7 @@ import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleShee
 import { parseDateTime, toDateInput, toTimeInput } from '../lib/dates';
 import { useLists, useStore, type EditorTarget } from '../store/useStore';
 import { REPEAT_RULES, type AlertType, type RepeatRule } from '../types';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Chip, IconButton } from './common';
 import { isMac, useTheme } from './theme';
 
@@ -36,6 +37,7 @@ export function EditorScreen({ target, onClose, expanded, onToggleExpand }: { ta
   const [time, setTime] = useState(initialDue ? toTimeInput(initialDue) : '09:00');
   const [repeat, setRepeat] = useState<RepeatRule>(existing?.repeat_rule ?? 'none');
   const [showOptions, setShowOptions] = useState(false);
+  const insets = useSafeAreaInsets();
 
   const [itemId, setItemId] = useState<string | null>(existing?.id ?? null);
   const idRef = useRef<string | null>(existing?.id ?? null);
@@ -143,7 +145,7 @@ export function EditorScreen({ target, onClose, expanded, onToggleExpand }: { ta
 
   return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, backgroundColor: t.bg }}>
-      <View style={[styles.header, { borderBottomColor: t.border }]}>
+      <View style={[styles.header, { borderBottomColor: t.border, paddingTop: isMac ? 10 : insets.top + 6, paddingLeft: insets.left + 10, paddingRight: insets.right + 10 }]}>
         {isMac ? <IconButton label="✕" size={14} color={t.muted} onPress={done} /> : <IconButton label="‹ Notes" size={16} onPress={done} />}
         <View style={{ flex: 1 }} />
         {onToggleExpand ? <IconButton label={expanded ? '⤡' : '⤢'} size={15} color={t.textSecondary} onPress={onToggleExpand} /> : null}
@@ -176,7 +178,7 @@ export function EditorScreen({ target, onClose, expanded, onToggleExpand }: { ta
         />
       </ScrollView>
 
-      <View style={[styles.footer, { borderTopColor: t.border, backgroundColor: t.pane }]}>
+      <View style={[styles.footer, { borderTopColor: t.border, backgroundColor: t.pane, paddingBottom: insets.bottom + 14, paddingLeft: insets.left + 16, paddingRight: insets.right + 16 }]}>
         <Pressable onPress={() => setShowOptions(v => !v)} style={styles.footerRow}>
           <Text style={{ fontSize: 15 }}>{alertType === 'alarm' ? '⏰' : '🔔'}</Text>
           <Text style={{ color: t.text, fontSize: 14, fontWeight: '600', marginLeft: 8, flex: 1 }}>
@@ -272,10 +274,10 @@ function addDays(d: Date, n: number): Date {
 }
 
 const styles = StyleSheet.create({
-  header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, paddingTop: 10, paddingBottom: 6, borderBottomWidth: StyleSheet.hairlineWidth },
+  header: { flexDirection: 'row', alignItems: 'center', paddingBottom: 6, borderBottomWidth: StyleSheet.hairlineWidth },
   title: { fontSize: 22, fontWeight: '700', paddingVertical: 6 },
   body: { fontSize: 16, lineHeight: 24, paddingVertical: 6 },
-  footer: { borderTopWidth: StyleSheet.hairlineWidth, paddingHorizontal: 16, paddingTop: 10, paddingBottom: 14 },
+  footer: { borderTopWidth: StyleSheet.hairlineWidth, paddingTop: 10 },
   footerRow: { flexDirection: 'row', alignItems: 'center' },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', marginTop: 8 },
   sectionLabel: { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 12 },

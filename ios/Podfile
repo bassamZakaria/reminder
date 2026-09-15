@@ -32,13 +32,21 @@ target 'Recall' do
       :mac_catalyst_enabled => false,
       # :ccache_enabled => true
     )
-    # fmt 11.0.2 (pinned by react-native 0.81) fails to compile its consteval format strings with Xcode 26.6 / Clang 21.
+    # fmt 11.0.2 (pinned by react-native 0.81) fails to compile its consteval format strings with Clang 21+.
     # Building only the fmt library target as C++17 turns consteval off; consumers stay on C++20.
-    installer.pods_project.targets.each do |target|
-      next unless target.name == 'fmt'
-      target.build_configurations.each do |build_config|
-        build_config.build_settings['CLANG_CXX_LANGUAGE_STANDARD'] = 'c++17'
+    # Xcode 27 also refuses deployment targets below 15.0, which some pod resource bundles still carry.
+    projects = [installer.pods_project] + installer.generated_projects
+    projects.compact.uniq.each do |project|
+      project.targets.each do |target|
+        target.build_configurations.each do |build_config|
+          build_config.build_settings['CLANG_CXX_LANGUAGE_STANDARD'] = 'c++17' if target.name == 'fmt'
+          current = build_config.build_settings['IPHONEOS_DEPLOYMENT_TARGET']
+          if current.nil? || current.to_f < 15.1
+            build_config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.1'
+          end
+        end
       end
+      project.save
     end
   end
 end

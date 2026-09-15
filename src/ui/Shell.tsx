@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useStore } from '../store/useStore';
 import { AlarmScreen } from './AlarmScreen';
 import { IconButton } from './common';
@@ -17,6 +17,7 @@ export function Shell() {
   const closeEditor = useStore(s => s.closeEditor);
   const [drawer, setDrawer] = useState(false);
   const [expanded, setExpanded] = useState(false);
+  const insets = useSafeAreaInsets();
 
   const menuButton = isMac ? undefined : <IconButton label="☰" size={19} color={t.textSecondary} onPress={() => setDrawer(true)} />;
   const content = view.kind === 'settings' ? <SettingsScreen headerLeft={menuButton} /> : <NoteList headerLeft={menuButton} />;
@@ -48,9 +49,9 @@ export function Shell() {
   ];
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: t.bg }} edges={['top', 'left', 'right']}>
+    <View style={{ flex: 1, backgroundColor: t.bg }}>
       <View style={{ flex: 1 }}>{content}</View>
-      <SafeAreaView edges={['bottom']} style={[styles.tabBar, { backgroundColor: t.card, borderTopColor: t.border }]}>
+      <View style={[styles.tabBar, { backgroundColor: t.card, borderTopColor: t.border, paddingBottom: insets.bottom }]}>
         <View style={{ flexDirection: 'row' }}>
           {tabs.map(item => (
             <Pressable key={item.key} onPress={item.go} style={styles.tabItem}>
@@ -59,27 +60,23 @@ export function Shell() {
             </Pressable>
           ))}
         </View>
-      </SafeAreaView>
+      </View>
 
       <Modal visible={drawer} animationType="slide" transparent onRequestClose={() => setDrawer(false)}>
         <View style={{ flex: 1, flexDirection: 'row' }}>
-          <SafeAreaView style={{ width: 260, backgroundColor: t.sidebar }}>
+          <View style={{ width: 272, backgroundColor: t.sidebar, paddingLeft: insets.left }}>
             <Sidebar onNavigate={() => setDrawer(false)} />
-          </SafeAreaView>
+          </View>
           <Pressable style={styles.scrim} onPress={() => setDrawer(false)} />
         </View>
       </Modal>
 
       <Modal visible={!!editor} animationType="slide" presentationStyle="fullScreen" onRequestClose={closeEditor}>
-        {editor ? (
-          <SafeAreaView style={{ flex: 1, backgroundColor: t.bg }} edges={['top', 'bottom']}>
-            <EditorScreen key={editorKey(editor)} target={editor} />
-          </SafeAreaView>
-        ) : null}
+        {editor ? <EditorScreen key={editorKey(editor)} target={editor} /> : null}
       </Modal>
 
       <AlarmScreen />
-    </SafeAreaView>
+    </View>
   );
 }
 

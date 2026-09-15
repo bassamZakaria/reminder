@@ -87,7 +87,8 @@ struct RecallAlarmMetadata: AlarmMetadata {}
     let time = Alarm.Schedule.Relative.Time(hour: parts.hour ?? 9, minute: parts.minute ?? 0)
     switch repeatRule {
     case "daily":
-      return .relative(Alarm.Schedule.Relative(time: time, repeats: .weekly(Locale.Weekday.allCases)))
+      let everyDay: [Locale.Weekday] = [.sunday, .monday, .tuesday, .wednesday, .thursday, .friday, .saturday]
+      return .relative(Alarm.Schedule.Relative(time: time, repeats: .weekly(everyDay)))
     case "weekly":
       let weekday = weekdayFor(parts.weekday ?? 1)
       return .relative(Alarm.Schedule.Relative(time: time, repeats: .weekly([weekday])))

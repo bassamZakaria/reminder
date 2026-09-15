@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { KeyboardAvoidingView, Platform, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { isConfigured } from '../lib/supabase';
 import { useStore } from '../store/useStore';
 import { Button, Input } from './common';
@@ -14,9 +15,10 @@ export function AuthScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [notice, setNotice] = useState<string | null>(null);
+  const insets = useSafeAreaInsets();
 
   return (
-    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={[styles.wrap, { backgroundColor: t.bg }]}>
+    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={[styles.wrap, { backgroundColor: t.bg, paddingTop: insets.top + 20, paddingBottom: insets.bottom + 20, paddingLeft: insets.left + 20, paddingRight: insets.right + 20 }]}>
       <View style={[styles.card, { backgroundColor: t.card, borderColor: t.border }]}>
         <View style={[styles.logo, { backgroundColor: t.accent }]}><Text style={{ color: '#fff', fontSize: 22, fontWeight: '800' }}>✓</Text></View>
         <Text style={[styles.title, { color: t.text }]}>Recall</Text>
@@ -42,7 +44,7 @@ export function AuthScreen() {
 }
 
 const styles = StyleSheet.create({
-  wrap: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 20 },
+  wrap: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   card: { width: '100%', maxWidth: 380, padding: 22, borderRadius: 16, borderWidth: 1 },
   title: { fontSize: 30, fontWeight: '800', marginBottom: 4 },
   logo: { width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginBottom: 12 },

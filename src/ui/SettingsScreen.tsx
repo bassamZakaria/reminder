@@ -2,8 +2,9 @@ import React, { useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { alarms } from '../lib/alarms';
 import { useStore } from '../store/useStore';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button } from './common';
-import { useTheme } from './theme';
+import { isMac, useTheme } from './theme';
 
 export function SettingsScreen({ headerLeft }: { headerLeft?: React.ReactNode }) {
   const t = useTheme();
@@ -17,6 +18,7 @@ export function SettingsScreen({ headerLeft }: { headerLeft?: React.ReactNode })
   const items = useStore(s => s.items);
   const noteCount = Object.keys(items).length;
   const [pending, setPending] = useState<string[] | null>(null);
+  const insets = useSafeAreaInsets();
 
   useEffect(() => {
     let cancelled = false;
@@ -35,7 +37,7 @@ export function SettingsScreen({ headerLeft }: { headerLeft?: React.ReactNode })
 
   return (
     <View style={{ flex: 1, backgroundColor: t.bg }}>
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: isMac ? 14 : insets.top + 8, paddingLeft: insets.left + 16, paddingRight: insets.right + 16 }]}>
         {headerLeft}
         <Text style={[styles.title, { color: t.text }]}>Settings</Text>
       </View>
@@ -66,7 +68,7 @@ function Row({ label, value }: { label: string; value: string }) {
 }
 
 const styles = StyleSheet.create({
-  header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingTop: 14, paddingBottom: 10 },
+  header: { flexDirection: 'row', alignItems: 'center', paddingBottom: 10 },
   title: { flex: 1, fontSize: 22, fontWeight: '700' },
   card: { margin: 16, borderRadius: 12, borderWidth: StyleSheet.hairlineWidth, overflow: 'hidden' },
   row: { flexDirection: 'row', justifyContent: 'space-between', padding: 14, borderBottomWidth: StyleSheet.hairlineWidth, gap: 12 },

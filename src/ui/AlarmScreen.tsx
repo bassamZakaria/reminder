@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { Animated, Easing, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useStore } from '../store/useStore';
 import { useTheme } from './theme';
 
@@ -9,6 +10,7 @@ export function AlarmScreen() {
   const dismissAlarm = useStore(s => s.dismissAlarm);
   const snoozeAlarm = useStore(s => s.snoozeAlarm);
   const pulse = useRef(new Animated.Value(0)).current;
+  const insets = useSafeAreaInsets();
 
   useEffect(() => {
     if (!alarm) {
@@ -33,7 +35,7 @@ export function AlarmScreen() {
 
   return (
     <Modal visible animationType="fade" transparent={false} onRequestClose={dismissAlarm}>
-      <View style={[styles.wrap, { backgroundColor: t.dark ? '#141210' : '#fff8ec' }]}>
+      <View style={[styles.wrap, { backgroundColor: t.dark ? '#141210' : '#fff8ec', paddingTop: insets.top + 32, paddingBottom: insets.bottom + 32, paddingLeft: insets.left + 32, paddingRight: insets.right + 32 }]}>
         <Animated.Text style={[styles.bell, { transform: [{ scale }] }]}>⏰</Animated.Text>
         <Text style={[styles.time, { color: t.text }]}>{now.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}</Text>
         <Text style={[styles.title, { color: t.text }]} numberOfLines={3}>
@@ -58,7 +60,7 @@ export function AlarmScreen() {
 }
 
 const styles = StyleSheet.create({
-  wrap: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 },
+  wrap: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   bell: { fontSize: 72, marginBottom: 18 },
   time: { fontSize: 40, fontWeight: '200', marginBottom: 10 },
   title: { fontSize: 24, fontWeight: '700', textAlign: 'center' },

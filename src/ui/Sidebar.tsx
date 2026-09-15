@@ -2,8 +2,9 @@ import React, { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useItems, useLists, useStore } from '../store/useStore';
 import { LIST_COLORS, type View as AppView } from '../types';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Input } from './common';
-import { useTheme } from './theme';
+import { isMac, useTheme } from './theme';
 
 function sameView(a: AppView, b: AppView): boolean {
   return a.kind === b.kind && ('id' in a && 'id' in b ? a.id === b.id : true);
@@ -20,6 +21,7 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   const [adding, setAdding] = useState(false);
   const [name, setName] = useState('');
   const [color, setColor] = useState(LIST_COLORS[0]);
+  const insets = useSafeAreaInsets();
 
   const go = (v: AppView) => {
     setView(v);
@@ -58,7 +60,7 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
 
   return (
     <View style={[styles.sidebar, { backgroundColor: t.sidebar, borderRightColor: t.border }]}>
-      <ScrollView contentContainerStyle={{ paddingTop: 34, paddingBottom: 16 }}>
+      <ScrollView contentContainerStyle={{ paddingTop: isMac ? 34 : insets.top + 12, paddingBottom: insets.bottom + 16 }}>
         <Text style={[styles.groupLabel, { color: t.muted }]}>RECALL</Text>
         <NavItem v={{ kind: 'all' }} icon="🗒️" label="All Notes" count={items.length} />
         <NavItem v={{ kind: 'reminders' }} icon="⏰" label="Reminders" count={reminders} />
@@ -99,7 +101,7 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
 }
 
 const styles = StyleSheet.create({
-  sidebar: { width: 210, borderRightWidth: StyleSheet.hairlineWidth },
+  sidebar: { flex: 1, width: isMac ? 210 : undefined, borderRightWidth: StyleSheet.hairlineWidth },
   groupRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingTop: 20, paddingBottom: 4 },
   groupLabel: { fontSize: 11, fontWeight: '700', letterSpacing: 0.6, paddingHorizontal: 16, paddingBottom: 6 },
   nav: { flexDirection: 'row', alignItems: 'center', marginHorizontal: 8, paddingVertical: 7, paddingHorizontal: 8, borderRadius: 7 },

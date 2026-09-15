@@ -3,9 +3,10 @@ import { Pressable, SectionList, StyleSheet, Text, View } from 'react-native';
 import { groupNotes, groupReminders, type Section } from '../lib/grouping';
 import { useItems, useStore } from '../store/useStore';
 import type { Item } from '../types';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Empty, IconButton, Input } from './common';
 import { NoteRow } from './NoteRow';
-import { useTheme } from './theme';
+import { isMac, useTheme } from './theme';
 
 export function NoteList({ headerLeft }: { headerLeft?: React.ReactNode }) {
   const t = useTheme();
@@ -17,6 +18,7 @@ export function NoteList({ headerLeft }: { headerLeft?: React.ReactNode }) {
   const openEditor = useStore(s => s.openEditor);
   const [showCompleted, setShowCompleted] = useState(false);
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+  const insets = useSafeAreaInsets();
 
   const folder = view.kind === 'folder' ? folders[view.id] : undefined;
   const title = view.kind === 'reminders' ? 'Reminders' : view.kind === 'folder' ? folder?.name ?? 'Folder' : 'All Notes';
@@ -43,7 +45,7 @@ export function NoteList({ headerLeft }: { headerLeft?: React.ReactNode }) {
 
   return (
     <View style={{ flex: 1, backgroundColor: t.bg }}>
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: isMac ? 14 : insets.top + 8, paddingLeft: insets.left + 16, paddingRight: insets.right + 16 }]}>
         {headerLeft}
         <View style={{ flex: 1 }}>
           <Text numberOfLines={1} style={[styles.title, { color: t.text }]}>
@@ -56,7 +58,7 @@ export function NoteList({ headerLeft }: { headerLeft?: React.ReactNode }) {
         ) : null}
         <IconButton label="✎" size={20} onPress={newNote} />
       </View>
-      <View style={{ paddingHorizontal: 12, paddingBottom: 8 }}>
+      <View style={{ paddingLeft: insets.left + 12, paddingRight: insets.right + 12, paddingBottom: 8 }}>
         <Input placeholder="Search" value={search} onChangeText={setSearch} clearButtonMode="while-editing" />
       </View>
       <SectionList
@@ -84,7 +86,7 @@ export function NoteList({ headerLeft }: { headerLeft?: React.ReactNode }) {
 }
 
 const styles = StyleSheet.create({
-  header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingTop: 14, paddingBottom: 8 },
+  header: { flexDirection: 'row', alignItems: 'center', paddingBottom: 8 },
   title: { fontSize: 22, fontWeight: '700' },
   sectionHeader: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 18, paddingTop: 14, paddingBottom: 4 },
   sectionTitle: { fontSize: 12, fontWeight: '700', letterSpacing: 0.3 },
