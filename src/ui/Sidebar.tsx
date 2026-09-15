@@ -56,14 +56,10 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
     );
   };
 
-  const reminders = items.filter(i => i.due_at && !i.is_completed).length;
-
   return (
     <View style={[styles.sidebar, { backgroundColor: t.sidebar, borderRightColor: t.border }]}>
       <ScrollView contentContainerStyle={{ paddingTop: isMac ? 34 : insets.top + 12, paddingBottom: insets.bottom + 16 }}>
-        <Text style={[styles.groupLabel, { color: t.muted }]}>RECALL</Text>
         <NavItem v={{ kind: 'all' }} icon="🗒️" label="All Notes" count={items.length} />
-        <NavItem v={{ kind: 'reminders' }} icon="⏰" label="Reminders" count={reminders} />
 
         <View style={styles.groupRow}>
           <Text style={[styles.groupLabel, { color: t.muted, paddingHorizontal: 0 }]}>FOLDERS</Text>

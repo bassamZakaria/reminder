@@ -42,25 +42,9 @@ export function Shell() {
     );
   }
 
-  const tabs = [
-    { key: 'all', icon: '🗒️', label: 'Notes', active: view.kind === 'all' || view.kind === 'folder', go: () => useStore.getState().setView({ kind: 'all' }) },
-    { key: 'reminders', icon: '⏰', label: 'Reminders', active: view.kind === 'reminders', go: () => useStore.getState().setView({ kind: 'reminders' }) },
-    { key: 'settings', icon: '⚙️', label: 'Settings', active: view.kind === 'settings', go: () => useStore.getState().setView({ kind: 'settings' }) },
-  ];
-
   return (
     <View style={{ flex: 1, backgroundColor: t.bg }}>
       <View style={{ flex: 1 }}>{content}</View>
-      <View style={[styles.tabBar, { backgroundColor: t.card, borderTopColor: t.border, paddingBottom: insets.bottom }]}>
-        <View style={{ flexDirection: 'row' }}>
-          {tabs.map(item => (
-            <Pressable key={item.key} onPress={item.go} style={styles.tabItem}>
-              <Text style={{ fontSize: 19, opacity: item.active ? 1 : 0.45 }}>{item.icon}</Text>
-              <Text style={{ color: item.active ? t.accent : t.muted, fontSize: 11, marginTop: 2, fontWeight: item.active ? '600' : '400' }}>{item.label}</Text>
-            </Pressable>
-          ))}
-        </View>
-      </View>
 
       <Modal visible={drawer} animationType="slide" transparent onRequestClose={() => setDrawer(false)}>
         <View style={{ flex: 1, flexDirection: 'row' }}>
@@ -86,7 +70,5 @@ function editorKey(editor: NonNullable<ReturnType<typeof useStore.getState>['edi
 
 const styles = StyleSheet.create({
   placeholder: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  tabBar: { borderTopWidth: StyleSheet.hairlineWidth },
-  tabItem: { flex: 1, alignItems: 'center', paddingVertical: 7 },
   scrim: { flex: 1, backgroundColor: 'rgba(0,0,0,0.35)' },
 });

@@ -1,21 +1,15 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
-import { parseDateTime, toDateInput, toTimeInput } from '../lib/dates';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { formatDue } from '../lib/dates';
 import { useLists, useStore, type EditorTarget } from '../store/useStore';
 import { REPEAT_RULES, type AlertType, type RepeatRule } from '../types';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Chip, IconButton } from './common';
+import { DateTimeSheet } from './DateTimeSheet';
 import { isMac, useTheme } from './theme';
-
-const QUICK: { label: string; at: () => Date }[] = [
-  { label: 'In 1 hour', at: () => new Date(Date.now() + 3600_000) },
-  { label: 'Tonight 8 PM', at: () => atTime(new Date(), 20, 0) },
-  { label: 'Tomorrow 9 AM', at: () => atTime(addDays(new Date(), 1), 9, 0) },
-  { label: 'Next week', at: () => atTime(addDays(new Date(), 7), 9, 0) },
-];
 
 export function EditorScreen({ target, onClose, expanded, onToggleExpand }: { target: NonNullable<EditorTarget>; onClose?: () => void; expanded?: boolean; onToggleExpand?: () => void }) {
   const t = useTheme();
+  const insets = useSafeAreaInsets();
   const existing = useStore(s => (target.kind === 'existing' ? s.items[target.id] : undefined));
   const folders = useLists();
   const createItem = useStore(s => s.createItem);
@@ -29,24 +23,17 @@ export function EditorScreen({ target, onClose, expanded, onToggleExpand }: { ta
   const [title, setTitle] = useState(existing?.title ?? '');
   const [body, setBody] = useState(existing?.body ?? '');
   const [listId, setListId] = useState<string | null>(existing?.list_id ?? (target.kind === 'new' ? target.listId : null));
-  const [pinned, setPinned] = useState(existing?.is_pinned ?? false);
   const [alertType, setAlertType] = useState<AlertType>(existing?.alert_type ?? 'notification');
-  const initialDue = existing?.due_at ? new Date(existing.due_at) : target.kind === 'new' && target.asReminder ? atTime(addDays(new Date(), 1), 9, 0) : null;
-  const [remind, setRemind] = useState(!!initialDue);
-  const [date, setDate] = useState(initialDue ? toDateInput(initialDue) : toDateInput(new Date()));
-  const [time, setTime] = useState(initialDue ? toTimeInput(initialDue) : '09:00');
+  const [due, setDue] = useState<Date | null>(existing?.due_at ? new Date(existing.due_at) : null);
   const [repeat, setRepeat] = useState<RepeatRule>(existing?.repeat_rule ?? 'none');
-  const [showOptions, setShowOptions] = useState(false);
-  const insets = useSafeAreaInsets();
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
 
   const [itemId, setItemId] = useState<string | null>(existing?.id ?? null);
   const idRef = useRef<string | null>(existing?.id ?? null);
   const dirty = useRef(false);
   const saveChain = useRef<Promise<void>>(Promise.resolve());
   const debounce = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const parsedDue = useMemo(() => (remind ? parseDateTime(date, time) : null), [remind, date, time]);
-  const dateInvalid = remind && !parsedDue;
   const completed = existing?.is_completed ?? false;
 
   const payload = useMemo(
@@ -54,12 +41,12 @@ export function EditorScreen({ target, onClose, expanded, onToggleExpand }: { ta
       title: title.trim(),
       body,
       list_id: listId,
-      is_pinned: pinned,
+      is_pinned: existing?.is_pinned ?? false,
       alert_type: alertType,
-      due_at: parsedDue ? parsedDue.toISOString() : null,
-      repeat_rule: parsedDue ? repeat : ('none' as RepeatRule),
+      due_at: due ? due.toISOString() : null,
+      repeat_rule: due ? repeat : ('none' as RepeatRule),
     }),
-    [title, body, listId, pinned, alertType, parsedDue, repeat],
+    [title, body, listId, alertType, due, repeat, existing?.is_pinned],
   );
   const latest = useRef(payload);
   latest.current = payload;
@@ -86,7 +73,7 @@ export function EditorScreen({ target, onClose, expanded, onToggleExpand }: { ta
   }, [createItem, updateItem]);
 
   useEffect(() => {
-    if (!dirty.current || dateInvalid) {
+    if (!dirty.current) {
       return;
     }
     debounce.current = setTimeout(() => {
@@ -99,7 +86,7 @@ export function EditorScreen({ target, onClose, expanded, onToggleExpand }: { ta
         debounce.current = null;
       }
     };
-  }, [payload, dateInvalid, save]);
+  }, [payload, save]);
 
   const mark = <T,>(setter: (v: T) => void) => (v: T) => {
     dirty.current = true;
@@ -111,7 +98,7 @@ export function EditorScreen({ target, onClose, expanded, onToggleExpand }: { ta
       clearTimeout(debounce.current);
       debounce.current = null;
     }
-    if (dirty.current && !dateInvalid) {
+    if (dirty.current) {
       await save();
     }
     (onClose ?? closeEditor)();
@@ -123,41 +110,39 @@ export function EditorScreen({ target, onClose, expanded, onToggleExpand }: { ta
       return;
     }
     const id = idRef.current;
-    Alert.alert('Delete Note', 'This note and its reminder will be deleted.', [
+    Alert.alert('Delete note', 'This note and its reminder will be removed.', [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Delete', style: 'destructive', onPress: () => deleteItem(id) },
     ]);
   };
 
   const pickAlert = async (next: AlertType) => {
-    dirty.current = true;
-    setAlertType(next);
+    mark(setAlertType)(next);
     if (next === 'alarm' && nativeAlarms) {
       await requestAlarmPermission();
     }
   };
 
-  const setWhen = (d: Date) => {
-    dirty.current = true;
-    setDate(toDateInput(d));
-    setTime(toTimeInput(d));
-  };
-
   return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, backgroundColor: t.bg }}>
-      <View style={[styles.header, { borderBottomColor: t.border, paddingTop: isMac ? 10 : insets.top + 6, paddingLeft: insets.left + 10, paddingRight: insets.right + 10 }]}>
-        {isMac ? <IconButton label="✕" size={14} color={t.muted} onPress={done} /> : <IconButton label="‹ Notes" size={16} onPress={done} />}
+      <View style={[styles.header, { borderBottomColor: t.border, paddingTop: isMac ? 10 : insets.top + 6, paddingLeft: insets.left + 12, paddingRight: insets.right + 12 }]}>
+        <Pressable onPress={done} hitSlop={8}>
+          <Text style={{ color: t.accent, fontSize: 16, fontWeight: '600' }}>{isMac ? 'Close' : 'Done'}</Text>
+        </Pressable>
         <View style={{ flex: 1 }} />
-        {onToggleExpand ? <IconButton label={expanded ? '⤡' : '⤢'} size={15} color={t.textSecondary} onPress={onToggleExpand} /> : null}
+        {onToggleExpand ? (
+          <Pressable onPress={onToggleExpand} hitSlop={8} style={styles.headerButton}>
+            <Text style={{ color: t.textSecondary, fontSize: 15 }}>{expanded ? '⤡' : '⤢'}</Text>
+          </Pressable>
+        ) : null}
         {itemId ? (
-          <>
-            <IconButton label={pinned ? '📌' : '📍'} size={14} color={t.textSecondary} onPress={() => mark(setPinned)(!pinned)} />
-            <IconButton label="🗑" size={14} color={t.danger} onPress={remove} />
-          </>
+          <Pressable onPress={remove} hitSlop={8} style={styles.headerButton}>
+            <Text style={{ color: t.danger, fontSize: 15 }}>🗑</Text>
+          </Pressable>
         ) : null}
       </View>
 
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 18, paddingBottom: 40 }} keyboardShouldPersistTaps="handled">
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: 18, paddingTop: 12, paddingBottom: 30 }} keyboardShouldPersistTaps="handled">
         <TextInput
           placeholder="Title"
           placeholderTextColor={t.muted}
@@ -165,121 +150,118 @@ export function EditorScreen({ target, onClose, expanded, onToggleExpand }: { ta
           onChangeText={mark(setTitle)}
           style={[styles.title, { color: t.text, textDecorationLine: completed ? 'line-through' : 'none' }]}
           autoFocus={!existing}
+          returnKeyType="next"
         />
         <TextInput
-          placeholder="Start writing…"
+          placeholder="Write your note…"
           placeholderTextColor={t.muted}
           value={body}
           onChangeText={mark(setBody)}
           multiline
           scrollEnabled={false}
           textAlignVertical="top"
-          style={[styles.body, { color: t.text, minHeight: expanded ? 420 : 180 }]}
+          style={[styles.body, { color: t.text, minHeight: expanded ? 400 : 220 }]}
         />
       </ScrollView>
 
-      <View style={[styles.footer, { borderTopColor: t.border, backgroundColor: t.pane, paddingBottom: insets.bottom + 14, paddingLeft: insets.left + 16, paddingRight: insets.right + 16 }]}>
-        <Pressable onPress={() => setShowOptions(v => !v)} style={styles.footerRow}>
-          <Text style={{ fontSize: 15 }}>{alertType === 'alarm' ? '⏰' : '🔔'}</Text>
-          <Text style={{ color: t.text, fontSize: 14, fontWeight: '600', marginLeft: 8, flex: 1 }}>
-            {remind && parsedDue ? `${alertType === 'alarm' ? 'Alarm' : 'Notification'} · ${parsedDue.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}` : 'Add reminder'}
-          </Text>
+      <View style={[styles.footer, { borderTopColor: t.border, backgroundColor: t.pane, paddingBottom: insets.bottom + 12, paddingLeft: insets.left + 16, paddingRight: insets.right + 16 }]}>
+        <Pressable onPress={() => (due ? setMoreOpen(v => !v) : setPickerOpen(true))} style={styles.reminderRow}>
+          <Text style={{ fontSize: 16 }}>{alertType === 'alarm' ? '⏰' : '🔔'}</Text>
+          <View style={{ flex: 1, marginLeft: 10 }}>
+            <Text style={{ color: t.text, fontSize: 15, fontWeight: '600' }}>{due ? formatDue(due.toISOString()) : 'Add reminder'}</Text>
+            {due ? (
+              <Text style={{ color: t.muted, fontSize: 12, marginTop: 1 }}>
+                {alertType === 'alarm' ? 'Alarm' : 'Notification'}
+                {repeat !== 'none' ? ` · repeats ${repeat}` : ''}
+              </Text>
+            ) : null}
+          </View>
           <Switch
-            value={remind}
-            onValueChange={v => {
-              mark(setRemind)(v);
-              setShowOptions(v);
+            value={!!due}
+            onValueChange={on => {
+              if (on) {
+                setPickerOpen(true);
+              } else {
+                mark(setDue)(null);
+                setMoreOpen(false);
+              }
             }}
           />
         </Pressable>
 
-        {remind && showOptions ? (
-          <ScrollView style={{ maxHeight: 280 }} contentContainerStyle={{ paddingTop: 10 }} keyboardShouldPersistTaps="handled">
-            <View style={{ flexDirection: 'row', gap: 10 }}>
-              <DateField value={date} onChange={mark(setDate)} placeholder="YYYY-MM-DD" flex={3} />
-              <DateField value={time} onChange={mark(setTime)} placeholder="HH:MM" flex={2} />
-            </View>
-            {dateInvalid ? <Text style={{ color: t.danger, marginTop: 6, fontSize: 12 }}>Use YYYY-MM-DD and 24-hour HH:MM</Text> : null}
+        {due && moreOpen ? (
+          <View style={styles.options}>
+            <Pressable onPress={() => setPickerOpen(true)} style={[styles.optionButton, { backgroundColor: t.bg }]}>
+              <Text style={{ color: t.accent, fontSize: 14, fontWeight: '600' }}>Change date & time</Text>
+            </Pressable>
 
+            <Text style={[styles.optionLabel, { color: t.muted }]}>Alert</Text>
             <View style={styles.chipRow}>
-              {QUICK.map(q => (
-                <Chip key={q.label} label={q.label} onPress={() => setWhen(q.at())} />
-              ))}
+              <Choice label="🔔 Notification" active={alertType === 'notification'} onPress={() => pickAlert('notification')} />
+              <Choice label="⏰ Alarm" active={alertType === 'alarm'} onPress={() => pickAlert('alarm')} />
             </View>
 
-            <Text style={[styles.sectionLabel, { color: t.muted }]}>Alert style</Text>
-            <View style={styles.chipRow}>
-              <Chip label="🔔 Notification" active={alertType === 'notification'} onPress={() => pickAlert('notification')} />
-              <Chip label="⏰ Alarm" active={alertType === 'alarm'} onPress={() => pickAlert('alarm')} />
-            </View>
-            <Text style={{ color: t.muted, fontSize: 11, marginBottom: 4 }}>
-              {alertType === 'alarm'
-                ? nativeAlarms
-                  ? 'Rings until you stop it, even in silent mode.'
-                  : 'Rings inside the app until you stop it.'
-                : 'A normal banner you can swipe away.'}
-            </Text>
-
-            <Text style={[styles.sectionLabel, { color: t.muted }]}>Repeat</Text>
+            <Text style={[styles.optionLabel, { color: t.muted }]}>Repeat</Text>
             <View style={styles.chipRow}>
               {REPEAT_RULES.map(r => (
-                <Chip key={r} label={r === 'none' ? 'Never' : r[0].toUpperCase() + r.slice(1)} active={repeat === r} onPress={() => mark(setRepeat)(r)} />
+                <Choice key={r} label={r === 'none' ? 'Never' : r[0].toUpperCase() + r.slice(1)} active={repeat === r} onPress={() => mark(setRepeat)(r)} />
               ))}
             </View>
 
-            <Text style={[styles.sectionLabel, { color: t.muted }]}>Folder</Text>
-            <View style={styles.chipRow}>
-              <Chip label="Notes" active={listId === null} onPress={() => mark(setListId)(null)} />
-              {folders.map(f => (
-                <Chip key={f.id} label={f.name} color={f.color} active={listId === f.id} onPress={() => mark(setListId)(f.id)} />
-              ))}
-            </View>
+            {folders.length ? (
+              <>
+                <Text style={[styles.optionLabel, { color: t.muted }]}>Folder</Text>
+                <View style={styles.chipRow}>
+                  <Choice label="None" active={listId === null} onPress={() => mark(setListId)(null)} />
+                  {folders.map(f => (
+                    <Choice key={f.id} label={f.name} active={listId === f.id} onPress={() => mark(setListId)(f.id)} />
+                  ))}
+                </View>
+              </>
+            ) : null}
 
-            {itemId && parsedDue ? (
-              <Pressable onPress={() => toggleComplete(itemId)} style={[styles.completeButton, { borderColor: t.border }]}>
-                <Text style={{ color: completed ? t.textSecondary : t.accent, fontWeight: '600', fontSize: 14 }}>{completed ? 'Mark as not done' : 'Mark as done'}</Text>
+            {itemId ? (
+              <Pressable onPress={() => toggleComplete(itemId)} style={[styles.optionButton, { backgroundColor: t.bg, marginTop: 12 }]}>
+                <Text style={{ color: completed ? t.textSecondary : t.accent, fontSize: 14, fontWeight: '600' }}>{completed ? 'Mark as not done' : 'Mark as done'}</Text>
               </Pressable>
             ) : null}
-          </ScrollView>
+          </View>
         ) : null}
       </View>
+
+      <DateTimeSheet
+        visible={pickerOpen}
+        value={due}
+        onCancel={() => setPickerOpen(false)}
+        onConfirm={d => {
+          setPickerOpen(false);
+          mark(setDue)(d);
+          setMoreOpen(true);
+        }}
+      />
     </KeyboardAvoidingView>
   );
 }
 
-function DateField({ value, onChange, placeholder, flex }: { value: string; onChange: (v: string) => void; placeholder: string; flex: number }) {
+function Choice({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
   const t = useTheme();
   return (
-    <TextInput
-      value={value}
-      onChangeText={onChange}
-      placeholder={placeholder}
-      placeholderTextColor={t.muted}
-      autoCapitalize="none"
-      style={{ flex, backgroundColor: t.card, color: t.text, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 9, fontSize: 14 }}
-    />
+    <Pressable onPress={onPress} style={({ pressed }) => [styles.chip, { backgroundColor: active ? t.accent : t.bg, opacity: pressed ? 0.7 : 1 }]}>
+      <Text style={{ color: active ? '#fff' : t.textSecondary, fontSize: 13, fontWeight: active ? '600' : '500' }}>{label}</Text>
+    </Pressable>
   );
 }
 
-function atTime(d: Date, h: number, m: number): Date {
-  const x = new Date(d.getTime());
-  x.setHours(h, m, 0, 0);
-  return x;
-}
-
-function addDays(d: Date, n: number): Date {
-  const x = new Date(d.getTime());
-  x.setDate(x.getDate() + n);
-  return x;
-}
-
 const styles = StyleSheet.create({
-  header: { flexDirection: 'row', alignItems: 'center', paddingBottom: 6, borderBottomWidth: StyleSheet.hairlineWidth },
-  title: { fontSize: 22, fontWeight: '700', paddingVertical: 6 },
-  body: { fontSize: 16, lineHeight: 24, paddingVertical: 6 },
+  header: { flexDirection: 'row', alignItems: 'center', paddingBottom: 8, borderBottomWidth: StyleSheet.hairlineWidth },
+  headerButton: { paddingHorizontal: 8, paddingVertical: 2 },
+  title: { fontSize: 24, fontWeight: '700', paddingVertical: 4 },
+  body: { fontSize: 16, lineHeight: 24, paddingTop: 4 },
   footer: { borderTopWidth: StyleSheet.hairlineWidth, paddingTop: 10 },
-  footerRow: { flexDirection: 'row', alignItems: 'center' },
-  chipRow: { flexDirection: 'row', flexWrap: 'wrap', marginTop: 8 },
-  sectionLabel: { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 12 },
-  completeButton: { borderWidth: StyleSheet.hairlineWidth, borderRadius: 8, paddingVertical: 10, alignItems: 'center', marginTop: 14 },
+  reminderRow: { flexDirection: 'row', alignItems: 'center' },
+  options: { marginTop: 12 },
+  optionButton: { borderRadius: 10, paddingVertical: 11, alignItems: 'center' },
+  optionLabel: { fontSize: 11, fontWeight: '700', letterSpacing: 0.5, textTransform: 'uppercase', marginTop: 14, marginBottom: 6 },
+  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  chip: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 14 },
 });
