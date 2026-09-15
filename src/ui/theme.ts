@@ -16,6 +16,7 @@ export interface Theme {
   accent: string;
   accentSoft: string;
   danger: string;
+  dangerSoft: string;
   success: string;
   sidebar: string;
   input: string;
@@ -28,14 +29,15 @@ const light: Theme = {
   pane: '#f6f7f9',
   card: '#ffffff',
   hover: '#f2f3f5',
-  selected: '#e8eefc',
+  selected: '#fdf1dc',
   text: '#191f28',
   textSecondary: '#5b6472',
   muted: '#9aa3ae',
   border: '#e6e8ec',
-  accent: '#4772fa',
-  accentSoft: '#e8eefc',
+  accent: '#f7a61b',
+  accentSoft: '#fdf1dc',
   danger: '#e53935',
+  dangerSoft: '#fdecea',
   success: '#2fb344',
   sidebar: '#f6f7f9',
   input: '#f2f3f5',
@@ -48,14 +50,15 @@ const dark: Theme = {
   pane: '#202020',
   card: '#242424',
   hover: '#2a2a2a',
-  selected: '#2c3550',
+  selected: '#3a2e18',
   text: '#f0f0f0',
   textSecondary: '#b0b4bb',
   muted: '#7a7f88',
   border: '#303030',
-  accent: '#5b83ff',
-  accentSoft: '#26325a',
+  accent: '#ffb63d',
+  accentSoft: '#3a2e18',
   danger: '#ff5c5c',
+  dangerSoft: '#3a2323',
   success: '#4cd964',
   sidebar: '#1e1e1e',
   input: '#2a2a2a',

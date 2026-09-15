@@ -1,6 +1,12 @@
 #import "AlarmNotifications.h"
 #import "AlarmNotificationsDelegate.h"
 #import <UserNotifications/UserNotifications.h>
+#import <TargetConditionals.h>
+#if __has_include(<AlarmNotifications/AlarmNotifications-Swift.h>)
+#import <AlarmNotifications/AlarmNotifications-Swift.h>
+#else
+#import "AlarmNotifications-Swift.h"
+#endif
 
 static NSString *const kCategory = @"RECALL_REMINDER";
 NSString *const kActionComplete = @"COMPLETE";
@@ -15,7 +21,7 @@ RCT_EXPORT_MODULE();
 
 + (BOOL)requiresMainQueueSetup { return NO; }
 
-- (NSArray<NSString *> *)supportedEvents { return @[@"notificationAction"]; }
+- (NSArray<NSString *> *)supportedEvents { return @[@"notificationAction", @"alarmFired"]; }
 
 - (instancetype)init {
   if (self = [super init]) {
@@ -38,10 +44,16 @@ RCT_EXPORT_MODULE();
 
 - (void)startObserving {
   _observing = YES;
-  NSArray *pending = [[AlarmNotificationsDelegate shared].pendingActions copy];
-  [[AlarmNotificationsDelegate shared].pendingActions removeAllObjects];
-  for (NSDictionary *event in pending) {
+  AlarmNotificationsDelegate *delegate = [AlarmNotificationsDelegate shared];
+  NSArray *actions = [delegate.pendingActions copy];
+  [delegate.pendingActions removeAllObjects];
+  for (NSDictionary *event in actions) {
     [self sendEventWithName:@"notificationAction" body:event];
+  }
+  NSArray *alarms = [delegate.pendingAlarms copy];
+  [delegate.pendingAlarms removeAllObjects];
+  for (NSDictionary *event in alarms) {
+    [self sendEventWithName:@"alarmFired" body:event];
   }
 }
 
@@ -55,10 +67,28 @@ RCT_EXPORT_MODULE();
   }
 }
 
+- (void)emitAlarm:(NSDictionary *)event {
+  if (_observing) {
+    [self sendEventWithName:@"alarmFired" body:event];
+  } else {
+    [[AlarmNotificationsDelegate shared].pendingAlarms addObject:event];
+  }
+}
+
 RCT_EXPORT_METHOD(requestPermission:(RCTPromiseResolveBlock)resolve rejecter:(RCTPromiseRejectBlock)reject) {
   UNAuthorizationOptions options = UNAuthorizationOptionAlert | UNAuthorizationOptionSound | UNAuthorizationOptionBadge;
   [[UNUserNotificationCenter currentNotificationCenter] requestAuthorizationWithOptions:options completionHandler:^(BOOL granted, NSError *error) {
     if (error) { reject(@"permission_error", error.localizedDescription, error); return; }
+    resolve(@(granted));
+  }];
+}
+
+RCT_EXPORT_METHOD(alarmsSupported:(RCTPromiseResolveBlock)resolve rejecter:(RCTPromiseRejectBlock)reject) {
+  resolve(@([AlarmKitBridge isSupported]));
+}
+
+RCT_EXPORT_METHOD(requestAlarmPermission:(RCTPromiseResolveBlock)resolve rejecter:(RCTPromiseRejectBlock)reject) {
+  [AlarmKitBridge requestAuthorization:^(BOOL granted) {
     resolve(@(granted));
   }];
 }
@@ -69,19 +99,32 @@ RCT_EXPORT_METHOD(schedule:(NSString *)identifier
                   body:(NSString *)body
                   fireAt:(double)fireAtMs
                   repeat:(NSString *)repeat
+                  alertType:(NSString *)alertType
                   resolver:(RCTPromiseResolveBlock)resolve
                   rejecter:(RCTPromiseRejectBlock)reject) {
+  NSDate *fireDate = [NSDate dateWithTimeIntervalSince1970:fireAtMs / 1000.0];
+  BOOL wantsAlarm = [alertType isEqualToString:@"alarm"];
+
+  if (wantsAlarm && [AlarmKitBridge isSupported] && [repeat isEqualToString:@"none"]) {
+    [[UNUserNotificationCenter currentNotificationCenter] removePendingNotificationRequestsWithIdentifiers:@[identifier]];
+    [AlarmKitBridge scheduleWithId:identifier title:title body:body ?: @"" fireAt:fireDate completion:^(NSError *error) {
+      if (error) { reject(@"alarm_error", error.localizedDescription, error); return; }
+      resolve(nil);
+    }];
+    return;
+  }
+
+  [AlarmKitBridge cancelWithId:identifier];
   UNMutableNotificationContent *content = [UNMutableNotificationContent new];
   content.title = title;
   content.body = body ?: @"";
   content.sound = [UNNotificationSound defaultSound];
   content.categoryIdentifier = kCategory;
-  content.userInfo = @{ @"itemId": itemId };
+  content.userInfo = @{ @"itemId": itemId, @"alertType": alertType ?: @"notification" };
   if (@available(iOS 15.0, macOS 12.0, *)) {
-    content.interruptionLevel = UNNotificationInterruptionLevelTimeSensitive;
+    content.interruptionLevel = wantsAlarm ? UNNotificationInterruptionLevelTimeSensitive : UNNotificationInterruptionLevelActive;
   }
 
-  NSDate *fireDate = [NSDate dateWithTimeIntervalSince1970:fireAtMs / 1000.0];
   NSCalendar *calendar = [NSCalendar currentCalendar];
   NSCalendarUnit units;
   BOOL repeats = YES;
@@ -111,20 +154,29 @@ RCT_EXPORT_METHOD(schedule:(NSString *)identifier
 RCT_EXPORT_METHOD(cancel:(NSArray<NSString *> *)identifiers) {
   [[UNUserNotificationCenter currentNotificationCenter] removePendingNotificationRequestsWithIdentifiers:identifiers];
   [[UNUserNotificationCenter currentNotificationCenter] removeDeliveredNotificationsWithIdentifiers:identifiers];
+  for (NSString *identifier in identifiers) {
+    [AlarmKitBridge cancelWithId:identifier];
+  }
 }
 
 RCT_EXPORT_METHOD(ackAction:(NSString *)eventId) {
   [[AlarmNotificationsDelegate shared] acknowledge:eventId];
 }
 
+RCT_EXPORT_METHOD(stopAlarmSound) {
+  [[AlarmNotificationsDelegate shared] stopAlarmSound];
+}
+
 RCT_EXPORT_METHOD(cancelAll) {
   [[UNUserNotificationCenter currentNotificationCenter] removeAllPendingNotificationRequests];
+  [AlarmKitBridge cancelAll];
 }
 
 RCT_EXPORT_METHOD(getPending:(RCTPromiseResolveBlock)resolve rejecter:(RCTPromiseRejectBlock)reject) {
   [[UNUserNotificationCenter currentNotificationCenter] getPendingNotificationRequestsWithCompletionHandler:^(NSArray<UNNotificationRequest *> *requests) {
     NSMutableArray *ids = [NSMutableArray new];
     for (UNNotificationRequest *request in requests) { [ids addObject:request.identifier]; }
+    [ids addObjectsFromArray:[AlarmKitBridge pendingIdentifiers]];
     resolve(ids);
   }];
 }

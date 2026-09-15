@@ -15,6 +15,7 @@ export default function App() {
   useEffect(() => {
     useStore.getState().init();
     const unsubscribe = alarms.onAction(event => useStore.getState().handleNotificationAction(event));
+    const unsubscribeAlarm = alarms.onAlarmFired(event => useStore.getState().onAlarmFired(event));
     const sub = AppState.addEventListener('change', state => {
       if (state === 'active' && useStore.getState().session) {
         useStore.getState().loadAll();
@@ -22,6 +23,7 @@ export default function App() {
     });
     return () => {
       unsubscribe();
+      unsubscribeAlarm();
       sub.remove();
     };
   }, []);
