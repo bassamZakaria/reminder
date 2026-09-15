@@ -273,9 +273,9 @@
 					"-ObjC",
 					"-lc++",
 				);
-				DEVELOPMENT_TEAM = P36Y2TQYPH;
+				DEVELOPMENT_TEAM = 78VKP3FU63;
 				CODE_SIGN_STYLE = Automatic;
-				PRODUCT_BUNDLE_IDENTIFIER = com.minly.recall;
+				PRODUCT_BUNDLE_IDENTIFIER = com.bassamsalah.recall;
 				PRODUCT_NAME = Recall;
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;
@@ -302,9 +302,9 @@
 					"-ObjC",
 					"-lc++",
 				);
-				DEVELOPMENT_TEAM = P36Y2TQYPH;
+				DEVELOPMENT_TEAM = 78VKP3FU63;
 				CODE_SIGN_STYLE = Automatic;
-				PRODUCT_BUNDLE_IDENTIFIER = com.minly.recall;
+				PRODUCT_BUNDLE_IDENTIFIER = com.bassamsalah.recall;
 				PRODUCT_NAME = Recall;
 				SWIFT_VERSION = 5.0;
 				VERSIONING_SYSTEM = "apple-generic";
