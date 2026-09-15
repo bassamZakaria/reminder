@@ -16,6 +16,11 @@ struct RecallAlarmMetadata: AlarmMetadata {}
     return false
   }
 
+  // AlarmKit can only express these natively; other rules fall back to notifications.
+  @objc public static func supportsRepeat(_ repeatRule: String) -> Bool {
+    return repeatRule == "none" || repeatRule == "daily" || repeatRule == "weekly"
+  }
+
   @objc public static func requestAuthorization(_ completion: @escaping (Bool) -> Void) {
     #if os(iOS) && canImport(AlarmKit)
     if #available(iOS 26.0, *) {
@@ -33,13 +38,33 @@ struct RecallAlarmMetadata: AlarmMetadata {}
     completion(false)
   }
 
-  @objc public static func schedule(id: String, title: String, body: String, fireAt: Date, completion: @escaping (NSError?) -> Void) {
+  @objc public static func schedule(id: String, title: String, body: String, fireAt: Date, repeatRule: String, snoozeMinutes: Int, completion: @escaping (NSError?) -> Void) {
     #if os(iOS) && canImport(AlarmKit)
     if #available(iOS 26.0, *) {
       let stop = AlarmButton(text: "Stop", textColor: .white, systemImageName: "stop.fill")
-      let alert = AlarmPresentation.Alert(title: LocalizedStringResource(stringLiteral: title), stopButton: stop)
-      let attributes = AlarmAttributes<RecallAlarmMetadata>(presentation: AlarmPresentation(alert: alert), metadata: RecallAlarmMetadata(), tintColor: Color(red: 1.0, green: 0.62, blue: 0.04))
-      let configuration = AlarmManager.AlarmConfiguration(schedule: .fixed(fireAt), attributes: attributes, sound: .default)
+      let snooze = AlarmButton(text: "Snooze", textColor: .white, systemImageName: "zzz")
+      let alert = AlarmPresentation.Alert(
+        title: LocalizedStringResource(stringLiteral: title.isEmpty ? "Reminder" : title),
+        stopButton: stop,
+        secondaryButton: snooze,
+        secondaryButtonBehavior: .countdown
+      )
+      let countdownTitle = LocalizedStringResource(stringLiteral: title.isEmpty ? "Reminder" : title)
+      let countdown = AlarmPresentation.Countdown(title: countdownTitle, pauseButton: nil)
+      let presentation = AlarmPresentation(alert: alert, countdown: countdown)
+      let attributes = AlarmAttributes<RecallAlarmMetadata>(
+        presentation: presentation,
+        metadata: RecallAlarmMetadata(),
+        tintColor: Color(red: 0.97, green: 0.65, blue: 0.10)
+      )
+
+      let schedule = makeSchedule(fireAt: fireAt, repeatRule: repeatRule)
+      let configuration = AlarmManager.AlarmConfiguration(
+        countdownDuration: Alarm.CountdownDuration(preAlert: nil, postAlert: TimeInterval(snoozeMinutes * 60)),
+        schedule: schedule,
+        attributes: attributes,
+        sound: .default
+      )
       Task {
         do {
           _ = try await AlarmManager.shared.schedule(id: stableUUID(id), configuration: configuration)
@@ -53,6 +78,37 @@ struct RecallAlarmMetadata: AlarmMetadata {}
     #endif
     completion(NSError(domain: "AlarmKitBridge", code: 1, userInfo: [NSLocalizedDescriptionKey: "AlarmKit unavailable"]))
   }
+
+  #if os(iOS) && canImport(AlarmKit)
+  @available(iOS 26.0, *)
+  private static func makeSchedule(fireAt: Date, repeatRule: String) -> Alarm.Schedule {
+    let calendar = Calendar.current
+    let parts = calendar.dateComponents([.hour, .minute, .weekday], from: fireAt)
+    let time = Alarm.Schedule.Relative.Time(hour: parts.hour ?? 9, minute: parts.minute ?? 0)
+    switch repeatRule {
+    case "daily":
+      return .relative(Alarm.Schedule.Relative(time: time, repeats: .weekly(Locale.Weekday.allCases)))
+    case "weekly":
+      let weekday = weekdayFor(parts.weekday ?? 1)
+      return .relative(Alarm.Schedule.Relative(time: time, repeats: .weekly([weekday])))
+    default:
+      return .fixed(fireAt)
+    }
+  }
+
+  @available(iOS 26.0, *)
+  private static func weekdayFor(_ index: Int) -> Locale.Weekday {
+    switch index {
+    case 1: return .sunday
+    case 2: return .monday
+    case 3: return .tuesday
+    case 4: return .wednesday
+    case 5: return .thursday
+    case 6: return .friday
+    default: return .saturday
+    }
+  }
+  #endif
 
   @objc public static func cancel(id: String) {
     #if os(iOS) && canImport(AlarmKit)

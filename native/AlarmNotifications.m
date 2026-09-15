@@ -105,9 +105,9 @@ RCT_EXPORT_METHOD(schedule:(NSString *)identifier
   NSDate *fireDate = [NSDate dateWithTimeIntervalSince1970:fireAtMs / 1000.0];
   BOOL wantsAlarm = [alertType isEqualToString:@"alarm"];
 
-  if (wantsAlarm && [AlarmKitBridge isSupported] && [repeat isEqualToString:@"none"]) {
+  if (wantsAlarm && [AlarmKitBridge isSupported] && [AlarmKitBridge supportsRepeat:repeat]) {
     [[UNUserNotificationCenter currentNotificationCenter] removePendingNotificationRequestsWithIdentifiers:@[identifier]];
-    [AlarmKitBridge scheduleWithId:identifier title:title body:body ?: @"" fireAt:fireDate completion:^(NSError *error) {
+    [AlarmKitBridge scheduleWithId:identifier title:title body:body ?: @"" fireAt:fireDate repeatRule:repeat snoozeMinutes:10 completion:^(NSError *error) {
       if (error) { reject(@"alarm_error", error.localizedDescription, error); return; }
       resolve(nil);
     }];
