@@ -26,7 +26,6 @@ interface State {
 
   init(): Promise<void>;
   signIn(email: string, password: string): Promise<void>;
-  signUp(email: string, password: string): Promise<string | null>;
   signOut(): Promise<void>;
   loadAll(): Promise<void>;
   setView(view: View): void;
@@ -143,16 +142,6 @@ export const useStore = create<State>((set, get) => ({
     set({ error: null, loading: true });
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     set({ loading: false, error: error?.message ?? null });
-  },
-
-  async signUp(email, password) {
-    set({ error: null, loading: true });
-    const { data, error } = await supabase.auth.signUp({ email, password });
-    set({ loading: false, error: error?.message ?? null });
-    if (error) {
-      return null;
-    }
-    return data.session ? null : 'Check your email to confirm your account, then sign in.';
   },
 
   async signOut() {

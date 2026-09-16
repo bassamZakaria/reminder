@@ -2350,20 +2350,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@react-native/new-app-screen@npm:0.81.6":
-  version: 0.81.6
-  resolution: "@react-native/new-app-screen@npm:0.81.6"
-  peerDependencies:
-    "@types/react": ^19.1.4
-    react: "*"
-    react-native: "*"
-  peerDependenciesMeta:
-    "@types/react":
-      optional: true
-  checksum: 3ec17070b74892b23ae9d572c45d26989fc1f61335891db5e9391a7f7c54031a827e3a5c3bbc2a14a8778a0ac1fe486c24cd370fe8690f106bfb525465244b02
-  languageName: node
-  linkType: hard
-
 "@react-native/normalize-colors@npm:0.81.6":
   version: 0.81.6
   resolution: "@react-native/normalize-colors@npm:0.81.6"
@@ -2929,7 +2915,6 @@ __metadata:
     "@react-native/babel-preset": 0.81.6
     "@react-native/eslint-config": 0.81.6
     "@react-native/metro-config": 0.81.6
-    "@react-native/new-app-screen": 0.81.6
     "@react-native/typescript-config": 0.81.6
     "@supabase/supabase-js": ^2.116.0
     "@types/jest": ^29.5.13

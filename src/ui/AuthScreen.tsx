@@ -9,12 +9,10 @@ import { useTheme } from './theme';
 export function AuthScreen() {
   const t = useTheme();
   const signIn = useStore(s => s.signIn);
-  const signUp = useStore(s => s.signUp);
   const loading = useStore(s => s.loading);
   const error = useStore(s => s.error);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [notice, setNotice] = useState<string | null>(null);
   const insets = useSafeAreaInsets();
 
   return (
@@ -29,15 +27,7 @@ export function AuthScreen() {
         <Input placeholder="Email" autoCapitalize="none" keyboardType="email-address" autoComplete="email" value={email} onChangeText={setEmail} style={{ marginBottom: 10 }} />
         <Input placeholder="Password" secureTextEntry value={password} onChangeText={setPassword} style={{ marginBottom: 14 }} onSubmitEditing={() => signIn(email.trim(), password)} />
         {error ? <Text style={{ color: t.danger, marginBottom: 10 }}>{error}</Text> : null}
-        {notice ? <Text style={{ color: t.accent, marginBottom: 10 }}>{notice}</Text> : null}
         <Button title={loading ? 'Please wait…' : 'Sign in'} disabled={loading || !email || !password} onPress={() => signIn(email.trim(), password)} />
-        <Button
-          title="Create account"
-          kind="ghost"
-          disabled={loading || !email || !password}
-          style={{ marginTop: 6 }}
-          onPress={async () => setNotice(await signUp(email.trim(), password))}
-        />
       </View>
     </KeyboardAvoidingView>
   );
