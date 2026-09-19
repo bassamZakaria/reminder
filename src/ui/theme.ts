@@ -21,6 +21,9 @@ export interface Theme {
   sidebar: string;
   input: string;
   check: string;
+  scrim: string;
+  toast: string;
+  toastText: string;
 }
 
 const light: Theme = {
@@ -42,6 +45,9 @@ const light: Theme = {
   sidebar: '#f6f7f9',
   input: '#f2f3f5',
   check: '#c4c9d1',
+  scrim: 'rgba(15,18,24,0.38)',
+  toast: '#1f2329',
+  toastText: '#ffffff',
 };
 
 const dark: Theme = {
@@ -63,6 +69,9 @@ const dark: Theme = {
   sidebar: '#1e1e1e',
   input: '#2a2a2a',
   check: '#4a4f58',
+  scrim: 'rgba(0,0,0,0.55)',
+  toast: '#f0f0f0',
+  toastText: '#191919',
 };
 
 export function useTheme(): Theme {

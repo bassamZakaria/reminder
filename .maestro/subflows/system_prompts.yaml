@@ -1,0 +1,12 @@
+appId: com.bassamsalah.recall
+---
+- runFlow:
+    when:
+      visible: ".*schedule alarms and timers.*"
+    commands:
+      - tapOn: "Allow"
+- runFlow:
+    when:
+      visible: "Save Password?"
+    commands:
+      - tapOn: "Not Now"

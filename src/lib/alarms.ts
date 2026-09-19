@@ -1,5 +1,5 @@
 import { NativeEventEmitter, NativeModules, Platform } from 'react-native';
-import type { AlertType, Item, RepeatRule } from '../types';
+import { AlertType, RepeatRule, type Item } from '../types';
 import { desiredSchedules, signature, SNOOZE_SUFFIX, type ScheduleRequest } from './schedule';
 
 interface NativeAlarms {
@@ -16,25 +16,31 @@ interface NativeAlarms {
   removeListeners(count: number): void;
 }
 
-export type NotificationAction = 'COMPLETE' | 'SNOOZE_10' | 'SNOOZE_60' | string;
+export enum NotificationAction {
+  Complete = 'COMPLETE',
+  Snooze10 = 'SNOOZE_10',
+  Snooze60 = 'SNOOZE_60',
+  Open = 'com.apple.UNNotificationDefaultActionIdentifier',
+  Dismiss = 'com.apple.UNNotificationDismissActionIdentifier',
+}
 export interface NotificationActionEvent {
   eventId?: string;
   itemId: string;
-  action: NotificationAction;
+  action: string;
 }
 export interface AlarmFiredEvent {
   itemId: string;
   title: string;
   body: string;
 }
-export const DEFAULT_ACTION = 'com.apple.UNNotificationDefaultActionIdentifier';
-export const DISMISS_ACTION = 'com.apple.UNNotificationDismissActionIdentifier';
 
 const native: NativeAlarms | undefined = NativeModules.AlarmNotifications;
 const supported = (Platform.OS === 'ios' || Platform.OS === 'macos') && !!native;
 const emitter = supported ? new NativeEventEmitter(native as never) : null;
 
 const scheduled = new Map<string, string>();
+
+export const TEST_PREFIX = 'test:';
 
 export const alarms = {
   supported,
@@ -78,7 +84,15 @@ export const alarms = {
     if (!supported) {
       return;
     }
-    await native!.schedule(identifier, itemId, title, body, fireAt.getTime(), 'none', alertType);
+    await native!.schedule(identifier, itemId, title, body, fireAt.getTime(), RepeatRule.None, alertType);
+  },
+
+  async scheduleTest(fireAt: Date, alertType: AlertType): Promise<void> {
+    if (!supported) {
+      return;
+    }
+    const title = alertType === AlertType.Alarm ? 'Test alarm' : 'Test reminder';
+    await native!.schedule(`${TEST_PREFIX}${fireAt.getTime()}`, 'test', title, 'Recall alerts are working on this device.', fireAt.getTime(), RepeatRule.None, alertType);
   },
 
   async pendingIds(): Promise<string[]> {
@@ -113,7 +127,7 @@ export const alarms = {
     const desired = desiredSchedules(items, now);
     const desiredIds = new Set(desired.map(d => d.identifier));
     const pending = await native!.getPending();
-    const stale = pending.filter(id => !desiredIds.has(id.endsWith(SNOOZE_SUFFIX) ? id.slice(0, -SNOOZE_SUFFIX.length) : id));
+    const stale = pending.filter(id => !id.startsWith(TEST_PREFIX) && !desiredIds.has(id.endsWith(SNOOZE_SUFFIX) ? id.slice(0, -SNOOZE_SUFFIX.length) : id));
     if (stale.length) {
       native!.cancel(stale);
       stale.forEach(id => scheduled.delete(id));

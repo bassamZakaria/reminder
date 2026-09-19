@@ -1,0 +1,31 @@
+appId: com.bassamsalah.recall
+name: 05_settings
+---
+- launchApp
+- extendedWaitUntil:
+    visible: "All Notes"
+    timeout: 15000
+- tapOn:
+    id: "menu"
+- tapOn:
+    id: "nav-settings"
+- assertVisible: "Settings"
+- assertVisible: ${EMAIL}
+- assertVisible: "Allowed"
+- tapOn:
+    id: "test-notification"
+- assertVisible: "Test notification in 5 seconds.*"
+- takeScreenshot: screenshots/05-settings
+- tapOn:
+    id: "sign-out"
+- tapOn: "Cancel"
+- assertVisible: "Settings"
+- tapOn:
+    id: "sign-out"
+- tapOn:
+    text: "Sign Out"
+    rightOf: "Cancel"
+- extendedWaitUntil:
+    visible:
+      id: "email"
+    timeout: 10000

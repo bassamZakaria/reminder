@@ -1,8 +1,14 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { isSameDay } from '../lib/schedule';
+import { Overlay, OverlayAnimation } from './Overlay';
 import { isMac, useTheme } from './theme';
+
+enum Meridiem {
+  AM = 'AM',
+  PM = 'PM',
+}
 
 const WEEKDAYS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 const ITEM_HEIGHT = 38;
@@ -47,39 +53,50 @@ export function DateTimeSheet({ visible, value, onCancel, onConfirm }: { visible
     setDraft(next);
   };
 
+  const now = new Date();
   const quick = [
-    { label: 'Later today', at: () => roundUp(new Date(Date.now() + 3 * 3600_000)) },
-    { label: 'Tonight', at: () => atTime(new Date(), 20, 0) },
-    { label: 'Tomorrow', at: () => atTime(addDays(new Date(), 1), 9, 0) },
-    { label: 'Next week', at: () => atTime(addDays(new Date(), 7), 9, 0) },
-  ];
+    { label: 'In 1 hour', at: roundUp(new Date(now.getTime() + 3600_000)) },
+    { label: 'This evening', at: atTime(now, 19, 0) },
+    { label: 'Tomorrow 9 AM', at: atTime(addDays(now, 1), 9, 0) },
+    { label: 'Next week', at: atTime(addDays(now, 7), 9, 0) },
+  ].filter(q => q.at.getTime() > now.getTime() + 15 * 60_000);
+  const inPast = draft.getTime() <= now.getTime();
 
   const hour12 = draft.getHours() % 12 === 0 ? 12 : draft.getHours() % 12;
   const pm = draft.getHours() >= 12;
 
   return (
-    <Modal visible={visible} transparent animationType={isMac ? 'fade' : 'slide'} onRequestClose={onCancel}>
+    <Overlay visible={visible} animationType={isMac ? OverlayAnimation.Fade : OverlayAnimation.Slide} onRequestClose={onCancel}>
       <View style={styles.backdrop}>
         <Pressable style={StyleSheet.absoluteFill} onPress={onCancel} />
-        <View style={[styles.sheet, { backgroundColor: t.bg, paddingBottom: insets.bottom + 16, maxWidth: isMac ? 380 : undefined, alignSelf: isMac ? 'center' : 'stretch', borderRadius: isMac ? 16 : 0, borderTopLeftRadius: 16, borderTopRightRadius: 16 }]}>
-          <View style={styles.grabber}>
-            <View style={[styles.grabberBar, { backgroundColor: t.border }]} />
-          </View>
+        <View style={[styles.sheet, { backgroundColor: t.bg, paddingBottom: insets.bottom + 16, maxWidth: isMac ? 380 : undefined, paddingTop: isMac ? 16 : 6, alignSelf: isMac ? 'center' : 'stretch', borderRadius: isMac ? 16 : 0, borderTopLeftRadius: 16, borderTopRightRadius: 16 }]}>
+          {!isMac ? (
+            <View style={styles.grabber}>
+              <View style={[styles.grabberBar, { backgroundColor: t.border }]} />
+            </View>
+          ) : null}
 
           <View style={styles.quickRow}>
             {quick.map(q => (
-              <Pressable key={q.label} onPress={() => setDraft(q.at())} style={({ pressed }) => [styles.quickChip, { backgroundColor: t.pane, opacity: pressed ? 0.6 : 1 }]}>
-                <Text style={{ color: t.text, fontSize: 12, fontWeight: '600' }}>{q.label}</Text>
+              <Pressable
+                key={q.label}
+                accessibilityRole="button"
+                onPress={() => {
+                  setDraft(q.at);
+                  setMonth(startOfMonth(q.at));
+                }}
+                style={({ pressed }) => [styles.quickChip, { backgroundColor: q.at.getTime() === draft.getTime() ? t.accentSoft : t.pane, opacity: pressed ? 0.6 : 1 }]}>
+                <Text style={[styles.quickText, { color: t.text }]}>{q.label}</Text>
               </Pressable>
             ))}
           </View>
 
           <View style={styles.monthRow}>
-            <Pressable onPress={() => setMonth(shiftMonth(month, -1))} hitSlop={10}>
+            <Pressable accessibilityRole="button" accessibilityLabel="Previous month" onPress={() => setMonth(shiftMonth(month, -1))} hitSlop={12}>
               <Text style={{ color: t.accent, fontSize: 20 }}>‹</Text>
             </Pressable>
             <Text style={{ color: t.text, fontSize: 15, fontWeight: '700' }}>{month.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}</Text>
-            <Pressable onPress={() => setMonth(shiftMonth(month, 1))} hitSlop={10}>
+            <Pressable accessibilityRole="button" accessibilityLabel="Next month" onPress={() => setMonth(shiftMonth(month, 1))} hitSlop={12}>
               <Text style={{ color: t.accent, fontSize: 20 }}>›</Text>
             </Pressable>
           </View>
@@ -96,10 +113,11 @@ export function DateTimeSheet({ visible, value, onCancel, onConfirm }: { visible
               const selected = isSameDay(d, draft);
               const today = isSameDay(d, new Date());
               const inMonth = d.getMonth() === month.getMonth();
+              const past = startOfDayTs(d) < startOfDayTs(now);
               return (
-                <Pressable key={d.toISOString()} onPress={() => setDay(d)} style={styles.cell}>
+                <Pressable key={d.toISOString()} accessibilityRole="button" accessibilityLabel={d.toDateString()} onPress={() => setDay(d)} style={styles.cell}>
                   <View style={[styles.day, selected && { backgroundColor: t.accent }]}>
-                    <Text style={{ color: selected ? '#fff' : inMonth ? t.text : t.muted, fontSize: 14, fontWeight: today && !selected ? '700' : '400' }}>{d.getDate()}</Text>
+                    <Text style={{ color: selected ? '#fff' : past ? t.check : inMonth ? t.text : t.muted, fontSize: 15, fontWeight: today && !selected ? '700' : '400' }}>{d.getDate()}</Text>
                   </View>
                   {today && !selected ? <View style={[styles.todayDot, { backgroundColor: t.accent }]} /> : null}
                 </Pressable>
@@ -114,10 +132,10 @@ export function DateTimeSheet({ visible, value, onCancel, onConfirm }: { visible
               <Text style={[styles.colon, { color: t.text }]}>:</Text>
               <Wheel items={MINUTES} value={nearestMinute(draft.getMinutes())} format={n => String(n).padStart(2, '0')} onChange={n => setTime(hour12, n, pm)} />
               <View style={styles.ampm}>
-                {['AM', 'PM'].map(label => {
-                  const active = (label === 'PM') === pm;
+                {[Meridiem.AM, Meridiem.PM].map(label => {
+                  const active = (label === Meridiem.PM) === pm;
                   return (
-                    <Pressable key={label} onPress={() => setTime(hour12, draft.getMinutes(), label === 'PM')} style={[styles.ampmButton, active && { backgroundColor: t.accent }]}>
+                    <Pressable key={label} onPress={() => setTime(hour12, draft.getMinutes(), label === Meridiem.PM)} style={[styles.ampmButton, active && { backgroundColor: t.accent }]}>
                       <Text style={{ color: active ? '#fff' : t.textSecondary, fontSize: 13, fontWeight: '600' }}>{label}</Text>
                     </Pressable>
                   );
@@ -126,11 +144,18 @@ export function DateTimeSheet({ visible, value, onCancel, onConfirm }: { visible
             </View>
           </View>
 
+          {inPast ? <Text style={[styles.warning, { color: t.danger }]}>That time is in the past. Pick a later time.</Text> : null}
+
           <View style={styles.actions}>
-            <Pressable onPress={onCancel} style={({ pressed }) => [styles.cancel, { borderColor: t.border, opacity: pressed ? 0.6 : 1 }]}>
+            <Pressable testID="date-cancel" accessibilityRole="button" onPress={onCancel} style={({ pressed }) => [styles.cancel, { borderColor: t.border, opacity: pressed ? 0.6 : 1 }]}>
               <Text style={{ color: t.textSecondary, fontSize: 15, fontWeight: '600' }}>Cancel</Text>
             </Pressable>
-            <Pressable onPress={() => onConfirm(draft)} style={({ pressed }) => [styles.confirm, { backgroundColor: t.accent, opacity: pressed ? 0.8 : 1 }]}>
+            <Pressable
+              testID="date-confirm"
+              accessibilityRole="button"
+              disabled={inPast}
+              onPress={() => onConfirm(draft)}
+              style={({ pressed }) => [styles.confirm, { backgroundColor: t.accent, opacity: inPast ? 0.4 : pressed ? 0.8 : 1 }]}>
               <Text style={{ color: '#fff', fontSize: 15, fontWeight: '700' }}>
                 {draft.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} at {draft.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}
               </Text>
@@ -138,7 +163,7 @@ export function DateTimeSheet({ visible, value, onCancel, onConfirm }: { visible
           </View>
         </View>
       </View>
-    </Modal>
+    </Overlay>
   );
 }
 
@@ -179,6 +204,9 @@ function Wheel({ items, value, format, onChange }: { items: number[]; value: num
   );
 }
 
+function startOfDayTs(d: Date): number {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+}
 function nearestMinute(m: number): number {
   return MINUTES.reduce((best, n) => (Math.abs(n - m) < Math.abs(best - m) ? n : best), 0);
 }
@@ -208,17 +236,19 @@ function shiftMonth(d: Date, n: number): Date {
 }
 
 const styles = StyleSheet.create({
-  backdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.35)' },
+  backdrop: { flex: 1, justifyContent: isMac ? 'center' : 'flex-end', backgroundColor: 'rgba(0,0,0,0.35)' },
   sheet: { paddingHorizontal: 16, paddingTop: 6 },
   grabber: { alignItems: 'center', paddingVertical: 8 },
   grabberBar: { width: 38, height: 4, borderRadius: 2 },
   quickRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 10 },
-  quickChip: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 14 },
+  quickChip: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 14 },
+  quickText: { fontSize: 13, fontWeight: '600' },
+  warning: { fontSize: 13, textAlign: 'center', marginTop: 10 },
   monthRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 6 },
   weekRow: { flexDirection: 'row' },
   weekday: { flex: 1, textAlign: 'center', fontSize: 11, fontWeight: '600', paddingBottom: 4 },
   grid: { flexDirection: 'row', flexWrap: 'wrap' },
-  cell: { width: `${100 / 7}%`, alignItems: 'center', paddingVertical: 2 },
+  cell: { width: '14.28%', alignItems: 'center', paddingVertical: 2 },
   day: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
   todayDot: { width: 4, height: 4, borderRadius: 2, marginTop: 1 },
   timeRow: { borderTopWidth: StyleSheet.hairlineWidth, marginTop: 10, paddingTop: 10 },

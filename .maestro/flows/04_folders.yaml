@@ -1,0 +1,73 @@
+appId: com.bassamsalah.recall
+name: 04_folders
+---
+- launchApp
+- extendedWaitUntil:
+    visible: "All Notes"
+    timeout: 15000
+- tapOn:
+    id: "menu"
+- tapOn:
+    id: "add-folder"
+- inputText: "Work"
+- tapOn:
+    id: "folder-create"
+- assertVisible:
+    id: "folder-Work"
+- takeScreenshot: screenshots/04-drawer
+- tapOn:
+    id: "folder-Work"
+- assertVisible: "Work"
+- assertVisible: "No notes yet"
+- tapOn:
+    id: "new-note"
+- tapOn:
+    id: "note-title"
+- inputText: "Quarterly report"
+- tapOn:
+    id: "editor-done"
+- assertVisible:
+    id: "row-Quarterly report"
+- takeScreenshot: screenshots/04-folder
+
+# Move a note into the folder from the editor
+- tapOn:
+    id: "menu"
+- tapOn:
+    id: "nav-all"
+- tapOn:
+    id: "row-Groceries list"
+- hideKeyboard
+- tapOn:
+    id: "folder-pill"
+- tapOn: "Work"
+- tapOn:
+    id: "editor-done"
+- tapOn:
+    id: "menu"
+- tapOn:
+    id: "folder-Work"
+- assertVisible:
+    id: "row-Groceries list"
+
+# Rename, then delete the folder (notes are kept)
+- tapOn:
+    id: "menu"
+- longPressOn:
+    id: "folder-Work"
+- tapOn: ".*Rename"
+- eraseText: 10
+- inputText: "Office"
+- tapOn: "Save"
+- assertVisible:
+    id: "folder-Office"
+- longPressOn:
+    id: "folder-Office"
+- tapOn: ".*Delete Folder"
+- tapOn: "Delete Folder"
+- assertNotVisible:
+    id: "folder-Office"
+- tapOn:
+    id: "nav-all"
+- assertVisible:
+    id: "row-Quarterly report"

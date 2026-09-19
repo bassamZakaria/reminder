@@ -1,4 +1,4 @@
-import type { AlertType, Item, RepeatRule } from '../types';
+import { RepeatRule, type AlertType, type Item } from '../types';
 
 export const SNOOZE_SUFFIX = ':snooze';
 
@@ -8,17 +8,17 @@ const DAY = 24 * HOUR;
 export function addRepeat(date: Date, rule: RepeatRule, count = 1): Date {
   const d = new Date(date.getTime());
   switch (rule) {
-    case 'hourly':
+    case RepeatRule.Hourly:
       return new Date(d.getTime() + count * HOUR);
-    case 'daily':
+    case RepeatRule.Daily:
       d.setDate(d.getDate() + count);
       return d;
-    case 'weekly':
+    case RepeatRule.Weekly:
       d.setDate(d.getDate() + 7 * count);
       return d;
-    case 'monthly':
+    case RepeatRule.Monthly:
       return addMonthsClamped(d, count);
-    case 'yearly':
+    case RepeatRule.Yearly:
       return addMonthsClamped(d, 12 * count);
     default:
       return d;
@@ -36,7 +36,7 @@ function addMonthsClamped(d: Date, months: number): Date {
 }
 
 export function nextOccurrence(dueAt: Date, rule: RepeatRule, now: Date): Date {
-  if (rule === 'none') {
+  if (rule === RepeatRule.None) {
     return dueAt;
   }
   let next = dueAt;
@@ -68,20 +68,20 @@ export function desiredSchedules(items: Item[], now: Date): ScheduleRequest[] {
     if (Number.isNaN(due.getTime())) {
       continue;
     }
-    if (item.repeat_rule === 'none' && due.getTime() <= now.getTime()) {
+    if (item.repeat_rule === RepeatRule.None && due.getTime() <= now.getTime()) {
       continue;
     }
     // A calendar repeat trigger has no start date, so a future first occurrence is armed as a
     // one-shot; once it is in the past, the next sync re-arms it as a true repeating trigger.
-    const firstOccurrencePending = item.repeat_rule !== 'none' && due.getTime() > now.getTime();
-    const fireAt = item.repeat_rule === 'none' || firstOccurrencePending ? due : nextOccurrence(due, item.repeat_rule, now);
+    const firstOccurrencePending = item.repeat_rule !== RepeatRule.None && due.getTime() > now.getTime();
+    const fireAt = item.repeat_rule === RepeatRule.None || firstOccurrencePending ? due : nextOccurrence(due, item.repeat_rule, now);
     out.push({
       identifier: item.id,
       itemId: item.id,
       title: item.title || 'Reminder',
       body: firstLine(item.body),
       fireAt: fireAt.getTime(),
-      repeat: firstOccurrencePending ? 'none' : item.repeat_rule,
+      repeat: firstOccurrencePending ? RepeatRule.None : item.repeat_rule,
       alertType: item.alert_type,
     });
   }

@@ -1,0 +1,49 @@
+diff --git a/Libraries/Text/TextInput/Singleline/macOS/RCTUISecureTextField.mm b/Libraries/Text/TextInput/Singleline/macOS/RCTUISecureTextField.mm
+index 6f332dc1701cada0aff0e9a2678fa7bdcea0ef85..184589a848d01e3b09f6eba1880498ca280e2297 100644
+--- a/Libraries/Text/TextInput/Singleline/macOS/RCTUISecureTextField.mm
++++ b/Libraries/Text/TextInput/Singleline/macOS/RCTUISecureTextField.mm
+@@ -78,6 +78,44 @@
+   return RCTUISecureTextFieldCell.class;
+ }
+ 
++// The secure field editor does not forward textDidChange: to the control, so JS never saw
++// password edits. Listen for the field editor's own change notification instead.
++- (instancetype)initWithFrame:(NSRect)frame
++{
++  if (self = [super initWithFrame:frame]) {
++    [[NSNotificationCenter defaultCenter] addObserver:self
++                                             selector:@selector(rct_fieldEditorTextDidChange:)
++                                                 name:NSTextDidChangeNotification
++                                               object:nil];
++  }
++  return self;
++}
++
++- (void)dealloc
++{
++  [[NSNotificationCenter defaultCenter] removeObserver:self name:NSTextDidChangeNotification object:nil];
++}
++
++- (void)rct_fieldEditorTextDidChange:(NSNotification *)notification
++{
++  if (self.currentEditor == nil || notification.object != self.currentEditor) {
++    return;
++  }
++  id<RCTUITextFieldDelegate> delegate = self.delegate;
++  if ([delegate respondsToSelector:@selector(textFieldDidChange:)]) {
++    [delegate textFieldDidChange:self];
++  }
++}
++
++- (NSAttributedString *)attributedText
++{
++  NSText *editor = self.currentEditor;
++  if (editor == nil) {
++    return [super attributedText];
++  }
++  return [[NSAttributedString alloc] initWithString:editor.string attributes:self.defaultTextAttributes ?: @{}];
++}
++
+ @end
+ 
+ #endif // TARGET_OS_OSX

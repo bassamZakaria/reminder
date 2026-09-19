@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { ActivityIndicator, AppState, StatusBar, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { alarms } from './src/lib/alarms';
+import { supabase } from './src/lib/supabase';
 import { useStore } from './src/store/useStore';
 import { AuthScreen } from './src/ui/AuthScreen';
 import { Shell } from './src/ui/Shell';
@@ -16,9 +17,15 @@ export default function App() {
     useStore.getState().init();
     const unsubscribe = alarms.onAction(event => useStore.getState().handleNotificationAction(event));
     const unsubscribeAlarm = alarms.onAlarmFired(event => useStore.getState().onAlarmFired(event));
+    supabase.auth.startAutoRefresh();
     const sub = AppState.addEventListener('change', state => {
-      if (state === 'active' && useStore.getState().session) {
-        useStore.getState().loadAll();
+      if (state === 'active') {
+        supabase.auth.startAutoRefresh();
+        if (useStore.getState().session) {
+          useStore.getState().loadAll();
+        }
+      } else {
+        supabase.auth.stopAutoRefresh();
       }
     });
     return () => {

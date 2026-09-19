@@ -1,0 +1,99 @@
+appId: com.bassamsalah.recall
+name: 03_reminders
+---
+- launchApp
+- extendedWaitUntil:
+    visible: "All Notes"
+    timeout: 15000
+- tapOn:
+    id: "new-note"
+- waitForAnimationToEnd
+- tapOn:
+    id: "note-title"
+- inputText: "Dentist"
+- hideKeyboard
+- tapOn:
+    id: "reminder-switch"
+- extendedWaitUntil:
+    visible:
+      id: "date-confirm"
+    timeout: 5000
+- takeScreenshot: screenshots/03-date-sheet
+- tapOn: "Tomorrow 9 AM"
+- tapOn:
+    id: "date-confirm"
+- assertVisible: ".*Tomorrow, 9:00.AM.*"
+- tapOn:
+    id: "alert-toggle"
+- runFlow: ../subflows/system_prompts.yaml
+- assertVisible: ".*Alarm"
+- tapOn:
+    id: "repeat-pill"
+- tapOn: "Weekly"
+- assertVisible: ".*Weekly"
+- takeScreenshot: screenshots/03-editor-reminder
+- tapOn:
+    id: "editor-done"
+- assertVisible:
+    id: "row-Dentist"
+
+# Reminders filter groups by day
+- tapOn:
+    id: "filter-reminders"
+- assertVisible: "Tomorrow"
+- assertVisible:
+    id: "row-Dentist"
+- takeScreenshot: screenshots/03-reminders
+
+# One-off reminder: complete it from the list
+- tapOn:
+    id: "filter-all"
+- tapOn:
+    id: "new-note"
+- waitForAnimationToEnd
+- tapOn:
+    id: "note-title"
+- inputText: "Take out trash"
+- hideKeyboard
+- tapOn:
+    id: "reminder-switch"
+- tapOn: "Next week"
+- tapOn:
+    id: "date-confirm"
+- tapOn:
+    id: "editor-done"
+- tapOn:
+    id: "complete-Take out trash"
+- assertNotVisible:
+    id: "row-Take out trash"
+- tapOn:
+    id: "filter-done"
+- assertVisible:
+    id: "row-Take out trash"
+- takeScreenshot: screenshots/03-done
+
+# Repeating reminder completes to its next occurrence
+- tapOn:
+    id: "filter-reminders"
+- tapOn:
+    id: "complete-Dentist"
+- extendedWaitUntil:
+    visible: "Next:.*"
+    timeout: 5000
+- assertVisible:
+    id: "row-Dentist"
+- assertNotVisible: ".*Tomorrow, 9:00.AM.*"
+
+# Turning the reminder off turns it back into a plain note
+- tapOn:
+    id: "row-Dentist"
+- waitForAnimationToEnd
+- tapOn:
+    id: "reminder-switch"
+- assertVisible: ".*Get an alert at a set time.*"
+- tapOn:
+    id: "editor-done"
+- assertNotVisible:
+    id: "row-Dentist"
+- tapOn:
+    id: "filter-all"

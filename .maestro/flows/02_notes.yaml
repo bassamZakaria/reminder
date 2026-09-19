@@ -1,0 +1,97 @@
+appId: com.bassamsalah.recall
+name: 02_notes
+---
+- launchApp
+- extendedWaitUntil:
+    visible: "All Notes"
+    timeout: 15000
+- tapOn:
+    id: "new-note"
+- tapOn:
+    id: "note-title"
+- inputText: "Groceries"
+- tapOn:
+    id: "note-body"
+- inputText: "Milk, eggs, bread"
+- takeScreenshot: screenshots/02-editor
+- tapOn:
+    id: "editor-done"
+- extendedWaitUntil:
+    visible:
+      id: "row-Groceries"
+    timeout: 5000
+- assertVisible: "Groceries, Milk, eggs, bread"
+
+# Title-less note falls back to its first line
+- tapOn:
+    id: "new-note"
+- tapOn:
+    id: "note-body"
+- inputText: "Call the bank about the card"
+- tapOn:
+    id: "editor-done"
+- assertVisible:
+    id: "row-Call the bank about the card"
+
+# Empty new note is discarded
+- tapOn:
+    id: "new-note"
+- tapOn:
+    id: "editor-done"
+- assertNotVisible:
+    id: "row-New Note"
+
+# Edit persists after relaunch
+- tapOn:
+    id: "row-Groceries"
+- tapOn:
+    id: "note-title"
+- eraseText: 20
+- inputText: "Groceries list"
+- tapOn:
+    id: "editor-done"
+- stopApp
+- launchApp
+- extendedWaitUntil:
+    visible:
+      id: "row-Groceries list"
+    timeout: 15000
+
+# Search
+- tapOn:
+    id: "search"
+- inputText: "bank"
+- assertVisible:
+    id: "row-Call the bank about the card"
+- assertNotVisible:
+    id: "row-Groceries list"
+- eraseText: 10
+- inputText: "zzzz"
+- assertVisible: "No results"
+- eraseText: 10
+- hideKeyboard
+
+# Pin via long-press menu
+- longPressOn:
+    id: "row-Call the bank about the card"
+- takeScreenshot: screenshots/02-row-menu
+- tapOn: ".*Pin to top"
+- assertVisible: "Pinned"
+
+# Delete from the editor, then undo
+- tapOn:
+    id: "row-Groceries list"
+- tapOn:
+    id: "editor-delete"
+- extendedWaitUntil:
+    visible:
+      id: "toast-undo"
+    timeout: 5000
+- takeScreenshot: screenshots/02-undo-toast
+- assertNotVisible:
+    id: "row-Groceries list"
+- tapOn:
+    id: "toast-undo"
+- assertVisible:
+    id: "row-Groceries list"
+- takeScreenshot: screenshots/02-list

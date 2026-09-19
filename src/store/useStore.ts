@@ -2,17 +2,30 @@ import { useMemo } from 'react';
 import { create } from 'zustand';
 import type { RealtimeChannel, Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
-import { alarms, DEFAULT_ACTION, DISMISS_ACTION, type AlarmFiredEvent, type NotificationActionEvent } from '../lib/alarms';
-import { nextOccurrence, SNOOZE_SUFFIX } from '../lib/schedule';
-import type { Item, List, RepeatRule, View } from '../types';
+import { alarms, NotificationAction, type AlarmFiredEvent, type NotificationActionEvent } from '../lib/alarms';
+import { addRepeat, nextOccurrence, SNOOZE_SUFFIX } from '../lib/schedule';
+import { RepeatRule, ViewKind, type Item, type List, type View } from '../types';
 
-export type EditorTarget = { kind: 'existing'; id: string } | { kind: 'new'; listId: string | null; asReminder: boolean } | null;
+export enum EditorKind {
+  Existing = 'existing',
+  New = 'new',
+}
+
+export type EditorTarget = { kind: EditorKind.Existing; id: string } | { kind: EditorKind.New; listId: string | null; nonce: number } | null;
+
+export interface Toast {
+  id: number;
+  message: string;
+  undoItem?: Item;
+}
 
 interface State {
   session: Session | null;
   authReady: boolean;
   loading: boolean;
+  refreshing: boolean;
   error: string | null;
+  toast: Toast | null;
   items: Record<string, Item>;
   lists: Record<string, List>;
   view: View;
@@ -28,6 +41,12 @@ interface State {
   signIn(email: string, password: string): Promise<void>;
   signOut(): Promise<void>;
   loadAll(): Promise<void>;
+  refresh(): Promise<void>;
+  clearError(): void;
+  showToast(message: string, undoItem?: Item): void;
+  dismissToast(): void;
+  undoDelete(): Promise<void>;
+  togglePin(id: string): Promise<void>;
   setView(view: View): void;
   setSearch(search: string): void;
   openEditor(target: EditorTarget): void;
@@ -39,7 +58,7 @@ interface State {
   requestAlarmPermission(): Promise<void>;
   createItem(input: Partial<Item>): Promise<Item | null>;
   updateItem(id: string, patch: Partial<Item>): Promise<void>;
-  deleteItem(id: string): Promise<void>;
+  deleteItem(id: string, silent?: boolean): Promise<void>;
   toggleComplete(id: string): Promise<void>;
   snooze(id: string, minutes: number): Promise<void>;
   createList(name: string, color: string): Promise<void>;
@@ -93,10 +112,12 @@ export const useStore = create<State>((set, get) => ({
   session: null,
   authReady: false,
   loading: false,
+  refreshing: false,
   error: null,
+  toast: null,
   items: {},
   lists: {},
-  view: { kind: 'all' },
+  view: { kind: ViewKind.All },
   search: '',
   editor: null,
   permissionGranted: null,
@@ -115,10 +136,11 @@ export const useStore = create<State>((set, get) => ({
         if (session && session.user.id !== hadUser) {
           resetReady();
           get().loadAll().then(markReady);
+          requestNotificationPermission(set);
         }
         if (!session) {
           teardownRealtime();
-          set({ items: {}, lists: {}, editor: null, view: { kind: 'all' }, activeAlarm: null });
+          set({ items: {}, lists: {}, editor: null, view: { kind: ViewKind.All }, activeAlarm: null, toast: null, error: null });
           alarms.cancelAll();
           resetReady();
         }
@@ -128,7 +150,9 @@ export const useStore = create<State>((set, get) => ({
       await get().loadAll();
     }
     markReady();
-    alarms.requestPermission().then(granted => set({ permissionGranted: granted })).catch(() => set({ permissionGranted: false }));
+    if (data.session) {
+      requestNotificationPermission(set);
+    }
     alarms.nativeAlarmsSupported().then(nativeAlarms => set({ nativeAlarms })).catch(() => set({ nativeAlarms: false }));
   },
 
@@ -141,7 +165,7 @@ export const useStore = create<State>((set, get) => ({
   async signIn(email, password) {
     set({ error: null, loading: true });
     const { error } = await supabase.auth.signInWithPassword({ email, password });
-    set({ loading: false, error: error?.message ?? null });
+    set({ loading: false, error: error ? friendlyError(error.message) : null });
   },
 
   async signOut() {
@@ -159,14 +183,59 @@ export const useStore = create<State>((set, get) => ({
       supabase.from('items').select('*').order('updated_at', { ascending: false }),
     ]);
     const error = listsRes.error ?? itemsRes.error;
+    if (error) {
+      set({ loading: false, error: friendlyError(error.message) });
+      return;
+    }
     set({
       loading: false,
-      error: error?.message ?? null,
+      error: null,
       lists: byId((listsRes.data ?? []) as List[]),
       items: byId((itemsRes.data ?? []) as Item[]),
     });
     setupRealtime(session.user.id, set, get);
     scheduleSync(get);
+  },
+
+  async refresh() {
+    set({ refreshing: true });
+    try {
+      await get().loadAll();
+    } finally {
+      set({ refreshing: false });
+    }
+  },
+
+  clearError: () => set({ error: null }),
+
+  showToast: (message, undoItem) => set({ toast: { id: Date.now(), message, undoItem } }),
+
+  dismissToast: () => set({ toast: null }),
+
+  async undoDelete() {
+    const item = get().toast?.undoItem;
+    set({ toast: null });
+    if (!item) {
+      return;
+    }
+    set(s => ({ items: { ...s.items, [item.id]: item } }));
+    const { error } = await supabase.from('items').insert(item);
+    if (error) {
+      set(s => {
+        const items = { ...s.items };
+        delete items[item.id];
+        return { items, error: friendlyError(error.message) };
+      });
+      return;
+    }
+    scheduleSync(get);
+  },
+
+  async togglePin(id) {
+    const item = get().items[id];
+    if (item) {
+      await get().updateItem(id, { is_pinned: !item.is_pinned });
+    }
   },
 
   setView: view => set({ view, editor: null, search: '', mobileFolders: false }),
@@ -199,7 +268,7 @@ export const useStore = create<State>((set, get) => ({
       .select()
       .single();
     if (error) {
-      set({ error: error.message });
+      set({ error: friendlyError(error.message) });
       return null;
     }
     const item = data as Item;
@@ -218,25 +287,29 @@ export const useStore = create<State>((set, get) => ({
     scheduleSync(get);
     const { data, error } = await supabase.from('items').update(patch).eq('id', id).select().single();
     if (error) {
-      set(s => ({ items: { ...s.items, [id]: prev }, error: error.message }));
+      set(s => ({ items: { ...s.items, [id]: prev }, error: friendlyError(error.message) }));
       scheduleSync(get);
       return;
     }
     set(s => ({ items: { ...s.items, [id]: data as Item } }));
   },
 
-  async deleteItem(id) {
+  async deleteItem(id, silent) {
     const prev = get().items[id];
     set(s => {
       const items = { ...s.items };
       delete items[id];
-      return { items, editor: s.editor?.kind === 'existing' && s.editor.id === id ? null : s.editor };
+      return { items, editor: s.editor?.kind === EditorKind.Existing && s.editor.id === id ? null : s.editor };
     });
     alarms.cancel([id, id + SNOOZE_SUFFIX]);
     const { error } = await supabase.from('items').delete().eq('id', id);
     if (error && prev) {
-      set(s => ({ items: { ...s.items, [id]: prev }, error: error.message }));
+      set(s => ({ items: { ...s.items, [id]: prev }, error: friendlyError(error.message) }));
       scheduleSync(get);
+      return;
+    }
+    if (prev && !silent) {
+      get().showToast(prev.title ? `Deleted “${prev.title}”` : 'Note deleted', prev);
     }
   },
 
@@ -250,9 +323,10 @@ export const useStore = create<State>((set, get) => ({
       return;
     }
     alarms.cancel([id + SNOOZE_SUFFIX]);
-    if (item.repeat_rule !== 'none' && item.due_at) {
-      const next = nextOccurrence(new Date(item.due_at), item.repeat_rule, new Date());
+    if (item.repeat_rule !== RepeatRule.None && item.due_at) {
+      const next = nextOccurrence(addRepeat(new Date(item.due_at), item.repeat_rule), item.repeat_rule, new Date());
       await get().updateItem(id, { due_at: next.toISOString() });
+      get().showToast(`Next: ${next.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}, ${next.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}`);
       return;
     }
     await get().updateItem(id, { is_completed: true, completed_at: new Date().toISOString() });
@@ -264,8 +338,8 @@ export const useStore = create<State>((set, get) => ({
       return;
     }
     const fireAt = new Date(Date.now() + minutes * 60_000);
-    if (item.repeat_rule === 'none') {
-      await get().updateItem(id, { due_at: fireAt.toISOString() });
+    if (item.repeat_rule === RepeatRule.None) {
+      await get().updateItem(id, { due_at: fireAt.toISOString(), is_completed: false, completed_at: null });
       return;
     }
     await alarms.scheduleOnce(id + SNOOZE_SUFFIX, id, item.title || 'Reminder', item.body, fireAt, item.alert_type);
@@ -279,7 +353,7 @@ export const useStore = create<State>((set, get) => ({
     const sort_order = Object.keys(get().lists).length;
     const { data, error } = await supabase.from('lists').insert({ name, color, sort_order, user_id: session.user.id }).select().single();
     if (error) {
-      set({ error: error.message });
+      set({ error: friendlyError(error.message) });
       return;
     }
     const list = data as List;
@@ -294,7 +368,7 @@ export const useStore = create<State>((set, get) => ({
     set(s => ({ lists: { ...s.lists, [id]: { ...prev, ...patch } } }));
     const { error } = await supabase.from('lists').update(patch).eq('id', id);
     if (error) {
-      set(s => ({ lists: { ...s.lists, [id]: prev }, error: error.message }));
+      set(s => ({ lists: { ...s.lists, [id]: prev }, error: friendlyError(error.message) }));
     }
   },
 
@@ -309,17 +383,17 @@ export const useStore = create<State>((set, get) => ({
           items[item.id] = { ...item, list_id: null };
         }
       }
-      return { lists, items, view: s.view.kind === 'folder' && s.view.id === id ? { kind: 'all' } : s.view };
+      return { lists, items, view: s.view.kind === ViewKind.Folder && s.view.id === id ? { kind: ViewKind.All } : s.view };
     });
     const { error } = await supabase.from('lists').delete().eq('id', id);
     if (error && prev) {
-      set(s => ({ lists: { ...s.lists, [id]: prev }, error: error.message }));
+      set(s => ({ lists: { ...s.lists, [id]: prev }, error: friendlyError(error.message) }));
     }
   },
 
   async handleNotificationAction({ itemId, action, eventId }) {
     try {
-      if (action === DISMISS_ACTION) {
+      if (action === NotificationAction.Dismiss) {
         return;
       }
       await ready;
@@ -330,18 +404,18 @@ export const useStore = create<State>((set, get) => ({
         await get().loadAll();
       }
       switch (action) {
-        case 'COMPLETE':
+        case NotificationAction.Complete:
           await get().toggleComplete(itemId);
           break;
-        case 'SNOOZE_10':
+        case NotificationAction.Snooze10:
           await get().snooze(itemId, 10);
           break;
-        case 'SNOOZE_60':
+        case NotificationAction.Snooze60:
           await get().snooze(itemId, 60);
           break;
-        case DEFAULT_ACTION:
+        case NotificationAction.Open:
           if (get().items[itemId]) {
-            set({ view: { kind: 'reminders' }, editor: { kind: 'existing', id: itemId }, mobileFolders: false });
+            set({ editor: { kind: EditorKind.Existing, id: itemId }, mobileFolders: false });
           }
           break;
         default:
@@ -354,6 +428,13 @@ export const useStore = create<State>((set, get) => ({
     }
   },
 }));
+
+function requestNotificationPermission(set: (partial: Partial<State>) => void) {
+  alarms
+    .requestPermission()
+    .then(granted => set({ permissionGranted: granted }))
+    .catch(() => set({ permissionGranted: false }));
+}
 
 function teardownRealtime() {
   if (channel) {
@@ -382,7 +463,13 @@ function setupRealtime(userId: string, set: (fn: (s: State) => Partial<State>) =
         alarms.cancel([id, id + SNOOZE_SUFFIX]);
       } else {
         const item = payload.new as Item;
-        set(s => ({ items: { ...s.items, [item.id]: item } }));
+        set(s => {
+          const current = s.items[item.id];
+          if (current && current.updated_at > item.updated_at) {
+            return {};
+          }
+          return { items: { ...s.items, [item.id]: item } };
+        });
       }
       scheduleSync(get);
     })
@@ -400,6 +487,22 @@ function setupRealtime(userId: string, set: (fn: (s: State) => Partial<State>) =
       }
     })
     .subscribe();
+}
+
+export function friendlyError(message: string): string {
+  if (/network request failed|failed to fetch|load failed/i.test(message)) {
+    return 'Can’t reach the server. Check your connection and try again.';
+  }
+  if (/invalid login credentials/i.test(message)) {
+    return 'Wrong email or password.';
+  }
+  if (/issued at future/i.test(message)) {
+    return 'This device’s clock is out of sync. Turn on “Set time automatically”, then retry.';
+  }
+  if (/jwt expired|refresh token/i.test(message)) {
+    return 'Your session expired. Please sign in again.';
+  }
+  return message;
 }
 
 export const selectItems = (s: State) => Object.values(s.items);

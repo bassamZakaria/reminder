@@ -7529,6 +7529,58 @@ __metadata:
   languageName: node
   linkType: hard
 
+"react-native-macos@patch:react-native-macos@npm%3A0.81.9#./.yarn/patches/react-native-macos-npm-0.81.9-aa583a0648.patch::locator=Recall%40workspace%3A.":
+  version: 0.81.9
+  resolution: "react-native-macos@patch:react-native-macos@npm%3A0.81.9#./.yarn/patches/react-native-macos-npm-0.81.9-aa583a0648.patch::version=0.81.9&hash=4d4faf&locator=Recall%40workspace%3A."
+  dependencies:
+    "@jest/create-cache-key-function": ^29.7.0
+    "@react-native-macos/virtualized-lists": 0.81.9
+    "@react-native/assets-registry": 0.81.6
+    "@react-native/codegen": 0.81.6
+    "@react-native/community-cli-plugin": 0.81.6
+    "@react-native/gradle-plugin": 0.81.6
+    "@react-native/js-polyfills": 0.81.6
+    "@react-native/normalize-colors": 0.81.6
+    abort-controller: ^3.0.0
+    anser: ^1.4.9
+    ansi-regex: ^5.0.0
+    babel-jest: ^29.7.0
+    babel-plugin-syntax-hermes-parser: 0.29.1
+    base64-js: ^1.5.1
+    commander: ^12.0.0
+    flow-enums-runtime: ^0.0.6
+    glob: ^7.1.1
+    invariant: ^2.2.4
+    jest-environment-node: ^29.7.0
+    memoize-one: ^5.0.0
+    metro-runtime: ^0.83.1
+    metro-source-map: ^0.83.1
+    nullthrows: ^1.1.1
+    pretty-format: ^29.7.0
+    promise: ^8.3.0
+    react-devtools-core: ^6.1.5
+    react-refresh: ^0.14.0
+    regenerator-runtime: ^0.13.2
+    scheduler: 0.26.0
+    semver: ^7.1.3
+    stacktrace-parser: ^0.1.10
+    whatwg-fetch: ^3.0.0
+    ws: ^6.2.3
+    yargs: ^17.6.2
+  peerDependencies:
+    "@types/react": ^19.1.4
+    react: ^19.1.4
+    react-native: 0.81.6
+  peerDependenciesMeta:
+    "@types/react":
+      optional: true
+  bin:
+    react-native: cli.js
+    react-native-macos: cli.js
+  checksum: 8bb375a67f527f110204d9f8c14c0bb88117d7e64c22eecdeed0d686d0bac7cdd61c3f10e43fea3445109e670461783ec540d0dd5fb91bdcf9e6019c8bbac921
+  languageName: node
+  linkType: hard
+
 "react-native-safe-area-context@npm:^5.5.2":
   version: 5.9.1
   resolution: "react-native-safe-area-context@npm:5.9.1"

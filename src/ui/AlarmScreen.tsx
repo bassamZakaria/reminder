@@ -1,7 +1,8 @@
 import React, { useEffect, useRef } from 'react';
-import { Animated, Easing, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Animated, Easing, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useStore } from '../store/useStore';
+import { Overlay } from './Overlay';
 import { useTheme } from './theme';
 
 export function AlarmScreen() {
@@ -34,7 +35,7 @@ export function AlarmScreen() {
   const now = new Date();
 
   return (
-    <Modal visible animationType="fade" transparent={false} onRequestClose={dismissAlarm}>
+    <Overlay visible transparent={false} onRequestClose={dismissAlarm}>
       <View style={[styles.wrap, { backgroundColor: t.dark ? '#141210' : '#fff8ec', paddingTop: insets.top + 32, paddingBottom: insets.bottom + 32, paddingLeft: insets.left + 32, paddingRight: insets.right + 32 }]}>
         <Animated.Text style={[styles.bell, { transform: [{ scale }] }]}>⏰</Animated.Text>
         <Text style={[styles.time, { color: t.text }]}>{now.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}</Text>
@@ -55,7 +56,7 @@ export function AlarmScreen() {
           </Pressable>
         </View>
       </View>
-    </Modal>
+    </Overlay>
   );
 }
 

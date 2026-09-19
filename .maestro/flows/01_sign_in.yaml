@@ -1,0 +1,28 @@
+appId: com.bassamsalah.recall
+name: 01_sign_in
+---
+- launchApp:
+    clearState: true
+    permissions:
+      notifications: allow
+- runFlow: ../subflows/system_prompts.yaml
+- extendedWaitUntil:
+    visible:
+      id: "email"
+    timeout: 20000
+- takeScreenshot: screenshots/01-sign-in
+- tapOn:
+    id: "email"
+- inputText: ${EMAIL}
+- tapOn:
+    id: "password"
+- inputText: "wrong-password"
+- tapOn:
+    id: "sign-in"
+- extendedWaitUntil:
+    visible: "Wrong email or password."
+    timeout: 10000
+- takeScreenshot: screenshots/01-sign-in-error
+- runFlow: ../subflows/sign_in.yaml
+- assertVisible: "No notes yet"
+- takeScreenshot: screenshots/01-empty-list

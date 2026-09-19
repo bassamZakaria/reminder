@@ -65,9 +65,11 @@ struct RecallAlarmMetadata: AlarmMetadata {}
         attributes: attributes,
         sound: .default
       )
+      let alarmId = stableUUID(id)
       Task {
         do {
-          _ = try await AlarmManager.shared.schedule(id: stableUUID(id), configuration: configuration)
+          try? AlarmManager.shared.cancel(id: alarmId)
+          _ = try await AlarmManager.shared.schedule(id: alarmId, configuration: configuration)
           completion(nil)
         } catch {
           completion(error as NSError)
@@ -134,7 +136,8 @@ struct RecallAlarmMetadata: AlarmMetadata {}
     #if os(iOS) && canImport(AlarmKit)
     if #available(iOS 26.0, *) {
       let alarms = (try? AlarmManager.shared.alarms) ?? []
-      return alarms.compactMap { idMap[$0.id.uuidString] }
+      // Item ids are Postgres UUIDs, so an alarm not seen since launch maps back to its lowercase form.
+      return alarms.map { idMap[$0.id.uuidString] ?? $0.id.uuidString.lowercased() }
     }
     #endif
     return []

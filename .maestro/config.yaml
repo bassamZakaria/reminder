@@ -1,0 +1,10 @@
+flows:
+  - "flows/*"
+executionOrder:
+  continueOnFailure: false
+  flowsOrder:
+    - 01_sign_in
+    - 02_notes
+    - 03_reminders
+    - 04_folders
+    - 05_settings

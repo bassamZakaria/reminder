@@ -1,0 +1,23 @@
+appId: com.bassamsalah.recall
+---
+- launchApp:
+    clearState: true
+    permissions:
+      notifications: allow
+- runFlow: system_prompts.yaml
+- extendedWaitUntil:
+    visible:
+      id: "email"
+    timeout: 20000
+- tapOn:
+    id: "email"
+- inputText: ${EMAIL}
+- tapOn:
+    id: "password"
+- inputText: ${PASSWORD}
+- tapOn:
+    id: "sign-in"
+- runFlow: system_prompts.yaml
+- extendedWaitUntil:
+    visible: "All Notes"
+    timeout: 15000

@@ -78,3 +78,7 @@ yarn-error.log
 app.config.json
 .supabase-db-password
 supabase/.temp/
+
+# Maestro
+.maestro/output/
+.maestro/screenshots/
