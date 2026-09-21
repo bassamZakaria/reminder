@@ -19,5 +19,6 @@ appId: com.bassamsalah.recall
     id: "sign-in"
 - runFlow: system_prompts.yaml
 - extendedWaitUntil:
-    visible: "All Notes"
+    visible:
+      id: "tab-reminders"
     timeout: 15000

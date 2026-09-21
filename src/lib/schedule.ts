@@ -1,4 +1,4 @@
-import { RepeatRule, type AlertType, type Item } from '../types';
+import { RepeatRule, type AlertType, type Note, type Reminder } from '../types';
 
 export const SNOOZE_SUFFIX = ':snooze';
 
@@ -50,7 +50,7 @@ export function nextOccurrence(dueAt: Date, rule: RepeatRule, now: Date): Date {
 
 export interface ScheduleRequest {
   identifier: string;
-  itemId: string;
+  reminderId: string;
   title: string;
   body: string;
   fireAt: number;
@@ -58,34 +58,43 @@ export interface ScheduleRequest {
   alertType: AlertType;
 }
 
-export function desiredSchedules(items: Item[], now: Date): ScheduleRequest[] {
+export function noteHeadline(note: Pick<Note, 'title' | 'body'> | undefined): string {
+  return note?.title || firstLine(note?.body ?? '') || 'Reminder';
+}
+
+export function desiredSchedules(reminders: Reminder[], notes: Record<string, Note>, now: Date): ScheduleRequest[] {
   const out: ScheduleRequest[] = [];
-  for (const item of items) {
-    if (item.is_completed || !item.due_at) {
+  for (const reminder of reminders) {
+    if (reminder.is_completed) {
       continue;
     }
-    const due = new Date(item.due_at);
+    const due = new Date(reminder.due_at);
     if (Number.isNaN(due.getTime())) {
       continue;
     }
-    if (item.repeat_rule === RepeatRule.None && due.getTime() <= now.getTime()) {
+    if (reminder.repeat_rule === RepeatRule.None && due.getTime() <= now.getTime()) {
       continue;
     }
     // A calendar repeat trigger has no start date, so a future first occurrence is armed as a
     // one-shot; once it is in the past, the next sync re-arms it as a true repeating trigger.
-    const firstOccurrencePending = item.repeat_rule !== RepeatRule.None && due.getTime() > now.getTime();
-    const fireAt = item.repeat_rule === RepeatRule.None || firstOccurrencePending ? due : nextOccurrence(due, item.repeat_rule, now);
+    const firstOccurrencePending = reminder.repeat_rule !== RepeatRule.None && due.getTime() > now.getTime();
+    const fireAt = reminder.repeat_rule === RepeatRule.None || firstOccurrencePending ? due : nextOccurrence(due, reminder.repeat_rule, now);
+    const note = notes[reminder.note_id];
     out.push({
-      identifier: item.id,
-      itemId: item.id,
-      title: item.title || 'Reminder',
-      body: firstLine(item.body),
+      identifier: reminder.id,
+      reminderId: reminder.id,
+      title: noteHeadline(note),
+      body: note?.title ? firstLine(note.body) : '',
       fireAt: fireAt.getTime(),
-      repeat: firstOccurrencePending ? RepeatRule.None : item.repeat_rule,
-      alertType: item.alert_type,
+      repeat: firstOccurrencePending ? RepeatRule.None : reminder.repeat_rule,
+      alertType: reminder.alert_type,
     });
   }
   return out;
+}
+
+export function nextAfterCompletion(reminder: Pick<Reminder, 'due_at' | 'repeat_rule'>, now: Date): Date {
+  return nextOccurrence(addRepeat(new Date(reminder.due_at), reminder.repeat_rule), reminder.repeat_rule, now);
 }
 
 export function signature(req: ScheduleRequest): string {

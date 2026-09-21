@@ -2,6 +2,7 @@ import { Platform, useColorScheme } from 'react-native';
 
 export const isMac = Platform.OS === 'macos';
 
+// Text colours meet WCAG AA (4.5:1) on bg, pane and their soft tints; `check` meets 3:1 for controls.
 export interface Theme {
   dark: boolean;
   bg: string;
@@ -14,16 +15,18 @@ export interface Theme {
   muted: string;
   border: string;
   accent: string;
+  accentFill: string;
+  onAccent: string;
   accentSoft: string;
   danger: string;
   dangerSoft: string;
-  success: string;
   sidebar: string;
   input: string;
   check: string;
   scrim: string;
   toast: string;
   toastText: string;
+  toastAction: string;
 }
 
 const light: Theme = {
@@ -31,23 +34,25 @@ const light: Theme = {
   bg: '#ffffff',
   pane: '#f6f7f9',
   card: '#ffffff',
-  hover: '#f2f3f5',
+  hover: '#f0f1f4',
   selected: '#fdf1dc',
   text: '#191f28',
-  textSecondary: '#5b6472',
-  muted: '#9aa3ae',
-  border: '#e6e8ec',
-  accent: '#f7a61b',
+  textSecondary: '#4b5563',
+  muted: '#6b7280',
+  border: '#e2e5ea',
+  accent: '#9a4a08',
+  accentFill: '#f7a61b',
+  onAccent: '#1f1300',
   accentSoft: '#fdf1dc',
-  danger: '#e53935',
+  danger: '#c62828',
   dangerSoft: '#fdecea',
-  success: '#2fb344',
   sidebar: '#f6f7f9',
-  input: '#f2f3f5',
-  check: '#c4c9d1',
+  input: '#f0f1f4',
+  check: '#8a929c',
   scrim: 'rgba(15,18,24,0.38)',
   toast: '#1f2329',
   toastText: '#ffffff',
+  toastAction: '#ffb63d',
 };
 
 const dark: Theme = {
@@ -58,20 +63,22 @@ const dark: Theme = {
   hover: '#2a2a2a',
   selected: '#3a2e18',
   text: '#f0f0f0',
-  textSecondary: '#b0b4bb',
-  muted: '#7a7f88',
-  border: '#303030',
+  textSecondary: '#c3c7cd',
+  muted: '#979ca4',
+  border: '#333333',
   accent: '#ffb63d',
+  accentFill: '#ffb63d',
+  onAccent: '#1f1300',
   accentSoft: '#3a2e18',
-  danger: '#ff5c5c',
+  danger: '#ff6b6b',
   dangerSoft: '#3a2323',
-  success: '#4cd964',
   sidebar: '#1e1e1e',
   input: '#2a2a2a',
-  check: '#4a4f58',
+  check: '#6e737c',
   scrim: 'rgba(0,0,0,0.55)',
   toast: '#f0f0f0',
   toastText: '#191919',
+  toastAction: '#9a4a08',
 };
 
 export function useTheme(): Theme {

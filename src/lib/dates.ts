@@ -68,3 +68,19 @@ export function formatRelative(iso: string, now = new Date()): string {
   }
   return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
+
+export function formatTime(d: Date): string {
+  return d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+}
+
+export function formatReminderTime(iso: string, now = new Date()): string {
+  const d = new Date(iso);
+  const diff = daysBetween(now, d);
+  if (diff === 0 || diff === 1) {
+    return formatTime(d);
+  }
+  if (diff > 1 && diff < 7) {
+    return `${d.toLocaleDateString(undefined, { weekday: 'short' })} ${formatTime(d)}`;
+  }
+  return `${d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: d.getFullYear() === now.getFullYear() ? undefined : 'numeric' })}, ${formatTime(d)}`;
+}

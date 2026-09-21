@@ -13,14 +13,14 @@ export enum AlertType {
 }
 
 export enum ViewKind {
-  All = 'all',
+  Reminders = 'reminders',
+  Notes = 'notes',
   Folder = 'folder',
   Settings = 'settings',
 }
 
-export enum ListFilter {
-  All = 'all',
-  Reminders = 'reminders',
+export enum ReminderFilter {
+  Upcoming = 'upcoming',
   Done = 'done',
 }
 
@@ -34,23 +34,31 @@ export interface List {
   updated_at: string;
 }
 
-export interface Item {
+export interface Note {
   id: string;
   user_id: string;
   list_id: string | null;
   title: string;
   body: string;
-  due_at: string | null;
-  repeat_rule: RepeatRule;
-  alert_type: AlertType;
-  is_completed: boolean;
-  completed_at: string | null;
   is_pinned: boolean;
   created_at: string;
   updated_at: string;
 }
 
-export type View = { kind: ViewKind.All } | { kind: ViewKind.Folder; id: string } | { kind: ViewKind.Settings };
+export interface Reminder {
+  id: string;
+  user_id: string;
+  note_id: string;
+  due_at: string;
+  repeat_rule: RepeatRule;
+  alert_type: AlertType;
+  is_completed: boolean;
+  completed_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type View = { kind: ViewKind.Reminders } | { kind: ViewKind.Notes } | { kind: ViewKind.Folder; id: string } | { kind: ViewKind.Settings };
 
 export const REPEAT_RULES: RepeatRule[] = Object.values(RepeatRule);
 

@@ -37,11 +37,13 @@ Free Supabase projects pause after 7 days without database activity. `.github/wo
 
 - Unit: `yarn test` (scheduling, grouping, store behaviour)
 - Types and lint: `yarn typecheck && yarn lint`
-- UI (iOS simulator): install [Maestro](https://maestro.mobile.dev), `npx supabase start`, point `app.config.json` at `http://127.0.0.1:54321` with the local anon key, build the app onto a booted simulator, then `yarn test:ui`. The script resets the local database, creates a test user and runs `.maestro/flows`.
+- UI (iOS simulator): install [Maestro](https://maestro.mobile.dev), `yarn supabase start`, point `app.config.json` at `http://127.0.0.1:54321` with the local anon key, build the app onto a booted simulator, then `yarn test:ui`. The script resets the local database, creates a test user and runs `.maestro/flows`.
 
-## Notes
+## How it works
 
-- Every item is a note; switching on “Remind me” makes it a reminder. Completing a repeating reminder advances it to the next occurrence.
-- Long-press a note to pin, complete, snooze or delete it; long-press a folder to rename or delete it. Deleting a note can be undone from the toast.
-- Notifications are scheduled locally on each signed-in device from the synced data, with Complete / Snooze 10 min / Snooze 1 hour actions. On iOS 26+ an “Alarm” reminder uses AlarmKit and rings like the Clock app.
-- Native module lives in `native/` (CocoaPod shared by the iOS and macOS projects).
+- **Reminders** tab: every reminder, grouped Overdue / Today / Tomorrow / Next 7 Days / Later, with its note's title and first line. Tap a reminder to see the full note, snooze it, or mark it done. Long-press for more.
+- **Notes** tab: every note, with its upcoming reminders shown under it. Filter by folder with the chips at the top; long-press a folder chip to rename or delete it.
+- A note can have any number of reminders. Each one has its own time, repeat, and notification or alarm style, edited from the note.
+- Completing a repeating reminder moves it to the next occurrence. Deleting a note can be undone from the toast.
+- Notifications are scheduled locally on each signed-in device from the synced data, with Complete / Snooze 10 min / Snooze 1 hour actions. On iOS 26+ an alarm reminder uses AlarmKit and rings like the Clock app.
+- Native module lives in `native/` (CocoaPod shared by the iOS and macOS projects). `.yarn/patches/` carries a react-native-macos fix for password fields.

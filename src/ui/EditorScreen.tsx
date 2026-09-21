@@ -1,85 +1,115 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { Alert, Keyboard, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { formatDue } from '../lib/dates';
+import { byDue } from '../lib/grouping';
 import { EditorKind, useLists, useStore, type EditorTarget } from '../store/useStore';
-import { AlertType, REPEAT_LABELS, REPEAT_RULES, RepeatRule } from '../types';
+import { AlertType, REPEAT_LABELS, REPEAT_RULES, RepeatRule, type Reminder } from '../types';
 import { ActionMenu, type MenuAction } from './common';
 import { DateTimeSheet } from './DateTimeSheet';
 import { isMac, useTheme } from './theme';
 
 enum EditorMenu {
-  Repeat = 'repeat',
   Folder = 'folder',
 }
+
+enum PickerMode {
+  Add = 'add',
+  Edit = 'edit',
+}
+
+type Picker = { mode: PickerMode.Add } | { mode: PickerMode.Edit; reminder: Reminder } | null;
+type RepeatMenu = { reminder: Reminder } | null;
+
+const OPEN_PICKER_DELAY_MS = 450;
 
 export function EditorScreen({ target, onClose, expanded, onToggleExpand }: { target: NonNullable<EditorTarget>; onClose?: () => void; expanded?: boolean; onToggleExpand?: () => void }) {
   const t = useTheme();
   const insets = useSafeAreaInsets();
-  const existing = useStore(s => (target.kind === EditorKind.Existing ? s.items[target.id] : undefined));
+  const existing = useStore(s => (target.kind === EditorKind.Existing ? s.notes[target.id] : undefined));
   const folders = useLists();
-  const createItem = useStore(s => s.createItem);
-  const updateItem = useStore(s => s.updateItem);
-  const deleteItem = useStore(s => s.deleteItem);
+  const createNote = useStore(s => s.createNote);
+  const updateNote = useStore(s => s.updateNote);
+  const deleteNote = useStore(s => s.deleteNote);
   const closeEditor = useStore(s => s.closeEditor);
-  const toggleComplete = useStore(s => s.toggleComplete);
+  const createReminder = useStore(s => s.createReminder);
+  const updateReminder = useStore(s => s.updateReminder);
+  const deleteReminder = useStore(s => s.deleteReminder);
+  const completeReminder = useStore(s => s.completeReminder);
   const nativeAlarms = useStore(s => s.nativeAlarms);
+  const alarmPermission = useStore(s => s.alarmPermission);
   const requestAlarmPermission = useStore(s => s.requestAlarmPermission);
 
   const [title, setTitle] = useState(existing?.title ?? '');
   const [body, setBody] = useState(existing?.body ?? '');
   const [listId, setListId] = useState<string | null>(existing?.list_id ?? (target.kind === EditorKind.New ? target.listId : null));
-  const [alertType, setAlertType] = useState<AlertType>(existing?.alert_type ?? AlertType.Notification);
-  const [due, setDue] = useState<Date | null>(existing?.due_at ? new Date(existing.due_at) : null);
-  const [repeat, setRepeat] = useState<RepeatRule>(existing?.repeat_rule ?? RepeatRule.None);
   const [pinned, setPinned] = useState(existing?.is_pinned ?? false);
-  const [pickerOpen, setPickerOpen] = useState(false);
+  const [picker, setPickerState] = useState<Picker>(null);
+  const setPicker = useCallback((next: Picker) => {
+    if (next) {
+      Keyboard.dismiss();
+    }
+    setPickerState(next);
+  }, []);
   const [menu, setMenu] = useState<EditorMenu | null>(null);
+  const [repeatMenu, setRepeatMenu] = useState<RepeatMenu>(null);
 
-  const [itemId, setItemId] = useState<string | null>(existing?.id ?? null);
+  const [noteId, setNoteId] = useState<string | null>(existing?.id ?? null);
   const idRef = useRef<string | null>(existing?.id ?? null);
   const dirty = useRef(false);
+  const unsaved = useRef(false);
   const saveChain = useRef<Promise<void>>(Promise.resolve());
   const debounce = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const unsaved = useRef(false);
   const bodyRef = useRef<TextInput>(null);
-  const completed = useStore(s => (itemId ? s.items[itemId]?.is_completed ?? false : false));
 
-  const payload = useMemo(
-    () => ({
-      title: title.trim(),
-      body,
-      list_id: listId,
-      is_pinned: pinned,
-      alert_type: alertType,
-      due_at: due ? due.toISOString() : null,
-      repeat_rule: due ? repeat : RepeatRule.None,
-    }),
-    [title, body, listId, alertType, due, repeat, pinned],
+  const allReminders = useStore(s => s.reminders);
+  const reminders = useMemo(
+    () =>
+      noteId
+        ? Object.values(allReminders)
+            .filter(r => r.note_id === noteId)
+            .sort((a, b) => Number(a.is_completed) - Number(b.is_completed) || byDue(a, b))
+        : [],
+    [allReminders, noteId],
   );
+  const focusReminderId = target.kind === EditorKind.Existing ? target.focusReminderId : undefined;
+  const openPickerOnMount = (target.kind === EditorKind.New && target.withReminder) || (target.kind === EditorKind.Existing && target.addReminder);
+
+  useEffect(() => {
+    if (!openPickerOnMount) {
+      return;
+    }
+    const timer = setTimeout(() => setPicker({ mode: PickerMode.Add }), OPEN_PICKER_DELAY_MS);
+    return () => clearTimeout(timer);
+  }, [openPickerOnMount, setPicker]);
+
+  const payload = useMemo(() => ({ title: title.trim(), body, list_id: listId, is_pinned: pinned }), [title, body, listId, pinned]);
   const latest = useRef(payload);
   latest.current = payload;
 
   // Saves run one after another so a create in flight can never be followed by a second create.
-  const save = useCallback((): Promise<void> => {
-    const run = async () => {
-      const data = latest.current;
-      if (idRef.current) {
-        await updateItem(idRef.current, data);
-        return;
-      }
-      if (!data.title && !data.body.trim()) {
-        return;
-      }
-      const created = await createItem(data);
-      if (created) {
-        idRef.current = created.id;
-        setItemId(created.id);
-      }
-    };
-    saveChain.current = saveChain.current.then(run, run);
-    return saveChain.current;
-  }, [createItem, updateItem]);
+  const save = useCallback(
+    (force = false): Promise<void> => {
+      const run = async () => {
+        const data = latest.current;
+        if (idRef.current) {
+          await updateNote(idRef.current, data);
+          return;
+        }
+        if (!force && !data.title && !data.body.trim()) {
+          return;
+        }
+        const created = await createNote(data);
+        if (created) {
+          idRef.current = created.id;
+          setNoteId(created.id);
+        }
+      };
+      saveChain.current = saveChain.current.then(run, run);
+      return saveChain.current;
+    },
+    [createNote, updateNote],
+  );
 
   useEffect(() => {
     if (!dirty.current) {
@@ -132,8 +162,9 @@ export function EditorScreen({ target, onClose, expanded, onToggleExpand }: { ta
     if (dirty.current) {
       await save();
     }
-    if (idRef.current && !data.title && !data.body.trim() && !data.due_at) {
-      deleteItem(idRef.current, true);
+    const id = idRef.current;
+    if (id && !data.title && !data.body.trim() && !Object.values(useStore.getState().reminders).some(r => r.note_id === id)) {
+      deleteNote(id, true);
     }
     close();
   };
@@ -144,101 +175,123 @@ export function EditorScreen({ target, onClose, expanded, onToggleExpand }: { ta
     const id = idRef.current;
     close();
     if (id) {
-      saveChain.current.then(() => deleteItem(id));
+      saveChain.current.then(() => deleteNote(id));
     }
   };
 
-  const pickAlert = async (next: AlertType) => {
-    mark(setAlertType)(next);
-    if (next === AlertType.Alarm && nativeAlarms) {
-      await requestAlarmPermission();
-    }
-  };
-
-  const toggleReminder = (on: boolean) => {
-    if (on) {
-      setPickerOpen(true);
-    } else {
-      mark(setDue)(null);
-      mark(setRepeat)(RepeatRule.None);
-    }
-  };
-
-  const markDone = async () => {
+  const ensureNote = async (): Promise<string | null> => {
     cancelPendingSave();
-    await save();
-    const id = idRef.current;
-    if (!id) {
+    await save(true);
+    return idRef.current;
+  };
+
+  const confirmPicker = async (date: Date) => {
+    const current = picker;
+    setPicker(null);
+    if (current?.mode === PickerMode.Edit) {
+      await updateReminder(current.reminder.id, { due_at: date.toISOString(), is_completed: false, completed_at: null });
       return;
     }
-    await toggleComplete(id);
-    const nextDue = useStore.getState().items[id]?.due_at;
-    setDue(nextDue ? new Date(nextDue) : null);
+    const id = await ensureNote();
+    if (id) {
+      await createReminder(id, { due_at: date.toISOString() });
+    }
+  };
+
+  const toggleAlert = async (reminder: Reminder) => {
+    const next = reminder.alert_type === AlertType.Alarm ? AlertType.Notification : AlertType.Alarm;
+    await updateReminder(reminder.id, { alert_type: next });
+    if (next !== AlertType.Alarm || !nativeAlarms || alarmPermission) {
+      return;
+    }
+    if (Platform.OS === 'android') {
+      Alert.alert('Ring exactly on time?', 'To ring at the exact minute, Recall needs the “Alarms & reminders” permission. You can change this later in Settings.', [
+        { text: 'Not Now', style: 'cancel' },
+        { text: 'Allow', onPress: () => requestAlarmPermission() },
+      ]);
+      return;
+    }
+    await requestAlarmPermission();
   };
 
   const folder = listId ? folders.find(f => f.id === listId) : undefined;
-  const pastDue = !!due && !completed && repeat === RepeatRule.None && due.getTime() < Date.now();
 
-  const menuActions: MenuAction[] =
-    menu === EditorMenu.Repeat
-      ? REPEAT_RULES.map(r => ({
-          label: `${repeat === r ? '✓  ' : ''}${REPEAT_LABELS[r]}`,
-          onPress: () => mark(setRepeat)(r),
-        }))
-      : menu === EditorMenu.Folder
-      ? [
-          {
-            label: `${listId === null ? '✓  ' : ''}No folder`,
-            onPress: () => mark(setListId)(null),
-          },
-          ...folders.map(f => ({
-            label: `${listId === f.id ? '✓  ' : ''}${f.name}`,
-            onPress: () => mark(setListId)(f.id),
-          })),
-        ]
-      : [];
+  const folderActions: MenuAction[] = [
+    { label: `${listId === null ? '✓  ' : ''}No folder`, onPress: () => mark(setListId)(null) },
+    ...folders.map(f => ({ label: `${listId === f.id ? '✓  ' : ''}${f.name}`, onPress: () => mark(setListId)(f.id) })),
+  ];
+  const repeatActions: MenuAction[] = repeatMenu
+    ? REPEAT_RULES.map(r => ({ label: `${repeatMenu.reminder.repeat_rule === r ? '✓  ' : ''}${REPEAT_LABELS[r]}`, onPress: () => updateReminder(repeatMenu.reminder.id, { repeat_rule: r }) }))
+    : [];
 
   return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={[styles.flex, { backgroundColor: t.bg }]}>
-      <View
-        style={[
-          styles.header,
-          {
-            borderBottomColor: t.border,
-            paddingTop: isMac ? 10 : insets.top + 6,
-            paddingLeft: insets.left + 12,
-            paddingRight: insets.right + 8,
-          },
-        ]}
-      >
+      <View style={[styles.header, { borderBottomColor: t.border, paddingTop: isMac ? 10 : insets.top + 6, paddingLeft: insets.left + 12, paddingRight: insets.right + 8 }]}>
         <Pressable testID="editor-done" accessibilityRole="button" onPress={done} hitSlop={10} style={styles.headerButton}>
           <Text style={[styles.doneText, { color: t.accent }]}>{isMac ? 'Close' : 'Done'}</Text>
         </Pressable>
         <View style={styles.flex} />
         {onToggleExpand ? <HeaderIcon label={expanded ? '⤡' : '⤢'} a11y={expanded ? 'Exit full width' : 'Full width'} onPress={onToggleExpand} color={t.textSecondary} /> : null}
         <HeaderIcon testID="editor-pin" label="📌" a11y={pinned ? 'Unpin note' : 'Pin note'} onPress={() => mark(setPinned)(!pinned)} dim={!pinned} />
-        {itemId ? <HeaderIcon testID="editor-delete" label="🗑" a11y="Delete note" onPress={remove} /> : null}
+        {noteId ? <HeaderIcon testID="editor-delete" label="🗑" a11y="Delete note" onPress={remove} /> : null}
       </View>
 
-      <ScrollView style={styles.flex} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive">
+      <ScrollView style={styles.flex} contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 30 }]} keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive">
         <TextInput
           testID="note-title"
           placeholder="Title"
           placeholderTextColor={t.muted}
           value={title}
           onChangeText={mark(setTitle)}
-          style={[
-            styles.title,
-            {
-              color: t.text,
-              textDecorationLine: completed ? 'line-through' : 'none',
-            },
-          ]}
-          autoFocus={!existing}
+          style={[styles.title, { color: t.text }]}
+          autoFocus={!existing && !openPickerOnMount}
           returnKeyType="next"
           blurOnSubmit={false}
           onSubmitEditing={() => bodyRef.current?.focus()}
         />
+
+        {folders.length ? (
+          <Pressable testID="folder-pill" accessibilityRole="button" onPress={() => {
+              Keyboard.dismiss();
+              setMenu(EditorMenu.Folder);
+            }} style={({ pressed }) => [styles.folderPill, { backgroundColor: t.pane, opacity: pressed ? 0.6 : 1 }]}>
+            {folder ? <View style={[styles.dot, { backgroundColor: folder.color }]} /> : null}
+            <Text style={[styles.folderText, { color: folder ? t.text : t.muted }]}>{folder ? folder.name : 'Add to folder'}</Text>
+          </Pressable>
+        ) : null}
+
+        <View testID="note-reminders" style={[styles.reminders, { backgroundColor: t.pane, borderColor: t.border }]}>
+          <View style={styles.remindersHeader}>
+            <Text style={[styles.remindersTitle, { color: t.textSecondary }]}>
+              ⏰ Reminders{reminders.length ? `  ${reminders.filter(r => !r.is_completed).length}` : ''}
+            </Text>
+            <Pressable testID="add-reminder" accessibilityRole="button" accessibilityLabel="Add reminder" onPress={() => setPicker({ mode: PickerMode.Add })} hitSlop={12}>
+              <Text style={[styles.addText, { color: t.accent }]}>＋ Add</Text>
+            </Pressable>
+          </View>
+          {reminders.length === 0 ? (
+            <Pressable onPress={() => setPicker({ mode: PickerMode.Add })} accessibilityRole="button">
+              <Text style={[styles.remindersEmpty, { color: t.muted }]}>No reminders. Add one to get a notification or alarm.</Text>
+            </Pressable>
+          ) : (
+            reminders.map(r => (
+              <EditorReminderRow
+                key={r.id}
+                reminder={r}
+                focused={r.id === focusReminderId}
+                onComplete={() => completeReminder(r.id)}
+                onChangeTime={() => setPicker({ mode: PickerMode.Edit, reminder: r })}
+                onToggleAlert={() => toggleAlert(r)}
+                onRepeat={() => {
+                  Keyboard.dismiss();
+                  setRepeatMenu({ reminder: r });
+                }}
+                onDelete={() => deleteReminder(r.id)}
+              />
+            ))
+          )}
+        </View>
+
         <TextInput
           ref={bodyRef}
           testID="note-body"
@@ -249,120 +302,81 @@ export function EditorScreen({ target, onClose, expanded, onToggleExpand }: { ta
           multiline
           scrollEnabled={isMac}
           textAlignVertical="top"
-          style={[styles.body, { color: t.text, minHeight: expanded ? 400 : 220 }]}
+          style={[styles.body, { color: t.text, minHeight: expanded ? 400 : 240 }]}
         />
       </ScrollView>
 
-      <View
-        style={[
-          styles.footer,
-          {
-            borderTopColor: t.border,
-            backgroundColor: t.pane,
-            paddingBottom: insets.bottom + 12,
-            paddingLeft: insets.left + 16,
-            paddingRight: insets.right + 16,
-          },
-        ]}
-      >
-        <View style={styles.reminderRow}>
-          <View style={[styles.reminderIcon, { backgroundColor: due ? t.accent : t.input }]}>
-            <Text style={styles.reminderGlyph}>{alertType === AlertType.Alarm ? '⏰' : '🔔'}</Text>
-          </View>
-          <Pressable testID="reminder-date" accessibilityRole="button" style={styles.flex} onPress={() => setPickerOpen(true)}>
-            <Text style={[styles.reminderTitle, { color: pastDue ? t.danger : t.text }]}>{due ? formatDue(due.toISOString()) : 'Remind me'}</Text>
-            <Text style={[styles.reminderSub, { color: pastDue ? t.danger : t.muted }]}>
-              {pastDue ? 'This time has passed. Tap to pick a new one.' : due ? 'Tap to change' : 'Get an alert at a set time'}
-            </Text>
-          </Pressable>
-          <Switch testID="reminder-switch" accessibilityLabel="Remind me" value={!!due} onValueChange={toggleReminder} trackColor={{ true: t.accent, false: t.check }} />
-        </View>
-
-        {due || folders.length ? (
-          <View style={styles.pills}>
-            {due ? (
-              <>
-                <Pill
-                  testID="alert-toggle"
-                  label={alertType === AlertType.Alarm ? '⏰ Alarm' : '🔔 Notification'}
-                  onPress={() => pickAlert(alertType === AlertType.Alarm ? AlertType.Notification : AlertType.Alarm)}
-                />
-                <Pill testID="repeat-pill" label={`↻ ${REPEAT_LABELS[repeat]}`} active={repeat !== RepeatRule.None} onPress={() => setMenu(EditorMenu.Repeat)} />
-              </>
-            ) : null}
-            {folders.length ? <Pill testID="folder-pill" label={folder ? `● ${folder.name}` : 'No folder'} color={folder?.color} onPress={() => setMenu(EditorMenu.Folder)} /> : null}
-          </View>
-        ) : null}
-
-        {due && itemId ? (
-          <Pressable
-            testID="mark-done"
-            accessibilityRole="button"
-            onPress={markDone}
-            style={({ pressed }) => [
-              styles.markDone,
-              {
-                backgroundColor: completed ? t.input : t.accentSoft,
-                opacity: pressed ? 0.7 : 1,
-              },
-            ]}
-          >
-            <Text style={[styles.markDoneText, { color: completed ? t.textSecondary : t.text }]}>
-              {completed ? '↺  Mark as not done' : repeat !== RepeatRule.None ? '✓  Done — move to next' : '✓  Mark as done'}
-            </Text>
-          </Pressable>
-        ) : null}
-      </View>
-
-      <DateTimeSheet
-        visible={pickerOpen}
-        value={due}
-        onCancel={() => setPickerOpen(false)}
-        onConfirm={d => {
-          setPickerOpen(false);
-          mark(setDue)(d);
-          if (completed && idRef.current) {
-            toggleComplete(idRef.current);
-          }
-        }}
-      />
-      <ActionMenu visible={menu !== null} title={menu === EditorMenu.Repeat ? 'Repeat' : 'Move to folder'} actions={menuActions} onClose={() => setMenu(null)} />
+      <DateTimeSheet visible={picker !== null} value={picker?.mode === PickerMode.Edit ? new Date(picker.reminder.due_at) : null} onCancel={() => setPicker(null)} onConfirm={confirmPicker} />
+      <ActionMenu visible={menu === EditorMenu.Folder} title="Move to folder" actions={folderActions} onClose={() => setMenu(null)} />
+      <ActionMenu visible={repeatMenu !== null} title="Repeat" actions={repeatActions} onClose={() => setRepeatMenu(null)} />
     </KeyboardAvoidingView>
+  );
+}
+
+function EditorReminderRow({
+  reminder,
+  focused,
+  onComplete,
+  onChangeTime,
+  onToggleAlert,
+  onRepeat,
+  onDelete,
+}: {
+  reminder: Reminder;
+  focused: boolean;
+  onComplete: () => void;
+  onChangeTime: () => void;
+  onToggleAlert: () => void;
+  onRepeat: () => void;
+  onDelete: () => void;
+}) {
+  const t = useTheme();
+  const now = new Date();
+  const overdue = !reminder.is_completed && new Date(reminder.due_at).getTime() < now.getTime();
+  const repeating = reminder.repeat_rule !== RepeatRule.None;
+  return (
+    <View testID="editor-reminder" style={[styles.reminderRow, { borderTopColor: t.border, backgroundColor: focused ? t.accentSoft : 'transparent' }]}>
+      <Pressable
+        accessibilityRole="checkbox"
+        accessibilityState={{ checked: reminder.is_completed }}
+        accessibilityLabel={reminder.is_completed ? 'Mark as not done' : 'Mark as done'}
+        onPress={onComplete}
+        hitSlop={10}
+        style={[styles.circle, { borderColor: reminder.is_completed ? t.accentFill : overdue ? t.danger : t.check, backgroundColor: reminder.is_completed ? t.accentFill : 'transparent' }]}>
+        {reminder.is_completed ? <Text style={[styles.tick, { color: t.onAccent }]}>✓</Text> : null}
+      </Pressable>
+      <Pressable testID="reminder-time" accessibilityRole="button" accessibilityHint="Changes the date and time" onPress={onChangeTime} style={styles.reminderTimeButton}>
+        <Text style={[styles.reminderTime, { color: reminder.is_completed ? t.muted : overdue ? t.danger : t.text, textDecorationLine: reminder.is_completed ? 'line-through' : 'none' }]}>
+          {formatDue(reminder.due_at, now)}
+        </Text>
+      </Pressable>
+      <Pill testID="alert-toggle" label={reminder.alert_type === AlertType.Alarm ? '⏰ Alarm' : '🔔'} onPress={onToggleAlert} active={reminder.alert_type === AlertType.Alarm} />
+      <Pill testID="repeat-pill" label={repeating ? `↻ ${REPEAT_LABELS[reminder.repeat_rule]}` : '↻'} onPress={onRepeat} active={repeating} />
+      <Pressable testID="reminder-delete" accessibilityRole="button" accessibilityLabel="Delete reminder" onPress={onDelete} hitSlop={4} style={styles.deleteButton}>
+        <Text style={[styles.deleteText, { color: t.muted }]}>✕</Text>
+      </Pressable>
+    </View>
   );
 }
 
 function HeaderIcon({ label, a11y, onPress, color, dim, testID }: { label: string; a11y: string; onPress: () => void; color?: string; dim?: boolean; testID?: string }) {
   return (
-    <Pressable
-      testID={testID}
-      accessibilityRole="button"
-      accessibilityLabel={a11y}
-      onPress={onPress}
-      hitSlop={8}
-      style={({ pressed }) => [styles.headerButton, { opacity: pressed ? 0.5 : dim ? 0.35 : 1 }]}
-    >
+    <Pressable testID={testID} accessibilityRole="button" accessibilityLabel={a11y} onPress={onPress} hitSlop={8} style={({ pressed }) => [styles.headerButton, { opacity: pressed ? 0.5 : dim ? 0.35 : 1 }]}>
       <Text style={[styles.headerIcon, color ? { color } : null]}>{label}</Text>
     </Pressable>
   );
 }
 
-function Pill({ label, onPress, active, color, testID }: { label: string; onPress: () => void; active?: boolean; color?: string; testID?: string }) {
+function Pill({ label, onPress, active, testID }: { label: string; onPress: () => void; active?: boolean; testID?: string }) {
   const t = useTheme();
   return (
     <Pressable
       testID={testID}
       accessibilityRole="button"
       onPress={onPress}
-      style={({ pressed }) => [
-        styles.pill,
-        {
-          backgroundColor: active ? t.accentSoft : t.bg,
-          borderColor: t.border,
-          opacity: pressed ? 0.6 : 1,
-        },
-      ]}
-    >
-      <Text numberOfLines={1} style={[styles.pillText, { color: color ?? (active ? t.text : t.textSecondary) }]}>
+      hitSlop={{ top: 8, bottom: 8, left: 2, right: 2 }}
+      style={({ pressed }) => [styles.pill, { backgroundColor: active ? t.accentSoft : t.bg, borderColor: t.border, opacity: pressed ? 0.6 : 1 }]}>
+      <Text numberOfLines={1} style={[styles.pillText, { color: active ? t.text : t.textSecondary }]}>
         {label}
       </Text>
     </Pressable>
@@ -371,50 +385,28 @@ function Pill({ label, onPress, active, color, testID }: { label: string; onPres
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingBottom: 8,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-  },
-  headerButton: { paddingHorizontal: 8, paddingVertical: 4 },
+  header: { flexDirection: 'row', alignItems: 'center', paddingBottom: 8, borderBottomWidth: StyleSheet.hairlineWidth },
+  headerButton: { minWidth: 44, minHeight: 44, paddingHorizontal: 8, alignItems: 'center', justifyContent: 'center' },
   headerIcon: { fontSize: 17 },
   doneText: { fontSize: 17, fontWeight: '700' },
-  content: { paddingHorizontal: 20, paddingTop: 14, paddingBottom: 30 },
-  title: {
-    fontSize: 26,
-    fontWeight: '800',
-    paddingVertical: 4,
-    letterSpacing: -0.3,
-    minHeight: 44,
-  },
-  body: { fontSize: 17, lineHeight: isMac ? undefined : 25, paddingTop: isMac ? 0 : 6, marginTop: isMac ? 10 : 4 },
-  footer: { borderTopWidth: StyleSheet.hairlineWidth, paddingTop: 12 },
-  reminderRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  reminderIcon: {
-    width: 34,
-    height: 34,
-    borderRadius: 9,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  reminderGlyph: { fontSize: 16 },
-  reminderTitle: { fontSize: 16, fontWeight: '700' },
-  reminderSub: { fontSize: 12, marginTop: 2 },
-  pills: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 10 },
-  pill: {
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: 16,
-    borderWidth: StyleSheet.hairlineWidth,
-    maxWidth: 200,
-  },
-  pillText: { fontSize: 13, fontWeight: '600' },
-  markDone: {
-    marginTop: 12,
-    borderRadius: 12,
-    paddingVertical: 12,
-    alignItems: 'center',
-  },
-  markDoneText: { fontSize: 15, fontWeight: '700' },
+  content: { paddingHorizontal: 18, paddingTop: 12, gap: 10 },
+  title: { fontSize: 26, fontWeight: '800', paddingVertical: 4, letterSpacing: -0.3, minHeight: 44 },
+  folderPill: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', gap: 6, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 12 },
+  folderText: { fontSize: 13, fontWeight: '600' },
+  dot: { width: 8, height: 8, borderRadius: 4 },
+  reminders: { borderRadius: 12, borderWidth: StyleSheet.hairlineWidth, overflow: 'hidden' },
+  remindersHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 12, paddingVertical: 9 },
+  remindersTitle: { fontSize: 13, fontWeight: '700' },
+  addText: { fontSize: 14, fontWeight: '700' },
+  remindersEmpty: { fontSize: 13, paddingHorizontal: 12, paddingBottom: 12 },
+  reminderRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingVertical: 4, minHeight: 48, borderTopWidth: StyleSheet.hairlineWidth },
+  circle: { width: 20, height: 20, borderRadius: 10, borderWidth: 1.7, alignItems: 'center', justifyContent: 'center' },
+  tick: { fontSize: 12, fontWeight: '800', lineHeight: 14 },
+  reminderTime: { fontSize: 14, fontWeight: '600' },
+  reminderTimeButton: { flex: 1, minHeight: 44, justifyContent: 'center' },
+  pill: { paddingHorizontal: 10, paddingVertical: 6, minHeight: 30, justifyContent: 'center', borderRadius: 15, borderWidth: StyleSheet.hairlineWidth, maxWidth: 120 },
+  pillText: { fontSize: 12, fontWeight: '600' },
+  deleteButton: { minWidth: 36, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
+  deleteText: { fontSize: 14, fontWeight: '700' },
+  body: { fontSize: 17, lineHeight: isMac ? undefined : 25, paddingTop: isMac ? 0 : 4 },
 });

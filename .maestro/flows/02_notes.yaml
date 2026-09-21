@@ -3,10 +3,15 @@ name: 02_notes
 ---
 - launchApp
 - extendedWaitUntil:
-    visible: "All Notes"
+    visible:
+      id: "tab-notes"
     timeout: 15000
 - tapOn:
+    id: "tab-notes"
+- assertVisible: "No notes yet"
+- tapOn:
     id: "new-note"
+- waitForAnimationToEnd
 - tapOn:
     id: "note-title"
 - inputText: "Groceries"
@@ -25,6 +30,7 @@ name: 02_notes
 # Title-less note falls back to its first line
 - tapOn:
     id: "new-note"
+- waitForAnimationToEnd
 - tapOn:
     id: "note-body"
 - inputText: "Call the bank about the card"
@@ -36,6 +42,7 @@ name: 02_notes
 # Empty new note is discarded
 - tapOn:
     id: "new-note"
+- waitForAnimationToEnd
 - tapOn:
     id: "editor-done"
 - assertNotVisible:
@@ -44,6 +51,7 @@ name: 02_notes
 # Edit persists after relaunch
 - tapOn:
     id: "row-Groceries"
+- waitForAnimationToEnd
 - tapOn:
     id: "note-title"
 - eraseText: 20
@@ -52,6 +60,12 @@ name: 02_notes
     id: "editor-done"
 - stopApp
 - launchApp
+- extendedWaitUntil:
+    visible:
+      id: "tab-notes"
+    timeout: 15000
+- tapOn:
+    id: "tab-notes"
 - extendedWaitUntil:
     visible:
       id: "row-Groceries list"
@@ -76,11 +90,12 @@ name: 02_notes
     id: "row-Call the bank about the card"
 - takeScreenshot: screenshots/02-row-menu
 - tapOn: ".*Pin to top"
-- assertVisible: "Pinned"
+- assertVisible: ".*Pinned"
 
 # Delete from the editor, then undo
 - tapOn:
     id: "row-Groceries list"
+- waitForAnimationToEnd
 - tapOn:
     id: "editor-delete"
 - extendedWaitUntil:
@@ -94,4 +109,4 @@ name: 02_notes
     id: "toast-undo"
 - assertVisible:
     id: "row-Groceries list"
-- takeScreenshot: screenshots/02-list
+- takeScreenshot: screenshots/02-notes

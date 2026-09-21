@@ -1,30 +1,21 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { Pressable, RefreshControl, SectionList, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, RefreshControl, ScrollView, SectionList, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { groupNotes, groupReminders, SectionKey, type Section } from '../lib/grouping';
-import { firstLine } from '../lib/schedule';
-import { EditorKind, useItems, useStore } from '../store/useStore';
-import { ListFilter, ViewKind, type Item } from '../types';
-import { ActionMenu, Empty, ErrorBanner, IconButton, Input, type MenuAction } from './common';
+import { groupNotes, remindersByNote, SectionKey, type Section } from '../lib/grouping';
+import { noteHeadline } from '../lib/schedule';
+import { EditorKind, useLists, useNotes, useReminders, useStore } from '../store/useStore';
+import { LIST_COLORS, ViewKind, type List, type Note } from '../types';
+import { ActionMenu, Empty, ErrorBanner, IconButton, Input, PromptSheet, type MenuAction } from './common';
 import { NoteRow } from './NoteRow';
 import { isMac, useTheme } from './theme';
 
-const FILTER_LABELS: Record<ListFilter, string> = {
-  [ListFilter.All]: 'Notes',
-  [ListFilter.Reminders]: 'Reminders',
-  [ListFilter.Done]: 'Done',
-};
+const NO_REMINDERS: never[] = [];
 
-const EMPTY: Record<ListFilter, { icon: string; title: string; hint: string }> = {
-  [ListFilter.All]: { icon: '🗒️', title: 'No notes yet', hint: isMac ? 'Press ＋ to write your first note.' : 'Tap ＋ to write your first note.' },
-  [ListFilter.Reminders]: { icon: '⏰', title: 'Nothing scheduled', hint: 'Open a note and switch on “Remind me” to get an alert.' },
-  [ListFilter.Done]: { icon: '✓', title: 'Nothing done yet', hint: 'Tick the circle on a reminder to complete it.' },
-};
-
-export function NoteList({ headerLeft }: { headerLeft?: React.ReactNode }) {
+export function NoteList({ bottomInset }: { bottomInset: number }) {
   const t = useTheme();
   const insets = useSafeAreaInsets();
-  const items = useItems();
+  const notes = useNotes();
+  const reminders = useReminders();
   const view = useStore(s => s.view);
   const folders = useStore(s => s.lists);
   const search = useStore(s => s.search);
@@ -33,151 +24,191 @@ export function NoteList({ headerLeft }: { headerLeft?: React.ReactNode }) {
   const refreshing = useStore(s => s.refreshing);
   const refresh = useStore(s => s.refresh);
   const togglePin = useStore(s => s.togglePin);
-  const toggleComplete = useStore(s => s.toggleComplete);
-  const deleteItem = useStore(s => s.deleteItem);
-  const snooze = useStore(s => s.snooze);
-  const [filter, setFilter] = useState<ListFilter>(ListFilter.All);
-  const [menuItem, setMenuItem] = useState<Item | null>(null);
+  const deleteNote = useStore(s => s.deleteNote);
+  const [menuNote, setMenuNote] = useState<Note | null>(null);
 
   const folderId = view.kind === ViewKind.Folder ? view.id : null;
   const folder = folderId ? folders[folderId] : undefined;
-  const title = folder?.name ?? 'All Notes';
+  const byNote = useMemo(() => remindersByNote(reminders), [reminders]);
 
-  const scoped = useMemo(() => {
+  const sections = useMemo<Section<Note>[]>(() => {
     const q = search.trim().toLowerCase();
-    const inFolder = folderId ? items.filter(i => i.list_id === folderId) : items;
-    return q ? inFolder.filter(i => i.title.toLowerCase().includes(q) || i.body.toLowerCase().includes(q)) : inFolder;
-  }, [items, folderId, search]);
-
-  const counts = useMemo(
-    () => ({
-      [ListFilter.All]: scoped.filter(i => !i.is_completed).length,
-      [ListFilter.Reminders]: scoped.filter(i => i.due_at && !i.is_completed).length,
-      [ListFilter.Done]: scoped.filter(i => i.is_completed).length,
-    }),
-    [scoped],
-  );
-
-  const sections = useMemo<Section[]>(() => {
-    const now = new Date();
-    if (filter === ListFilter.Reminders) {
-      return groupReminders(scoped.filter(i => i.due_at && !i.is_completed), now, false);
+    let scoped = folderId ? notes.filter(n => n.list_id === folderId) : notes;
+    if (q) {
+      scoped = scoped.filter(n => n.title.toLowerCase().includes(q) || n.body.toLowerCase().includes(q));
     }
-    if (filter === ListFilter.Done) {
-      return groupReminders(scoped.filter(i => i.is_completed), now, true);
-    }
-    return groupNotes(scoped.filter(i => !i.is_completed), now);
-  }, [scoped, filter]);
+    return groupNotes(scoped, new Date());
+  }, [notes, folderId, search]);
 
+  const count = sections.reduce((sum, s) => sum + s.data.length, 0);
   const newNote = () => openEditor({ kind: EditorKind.New, listId: folderId, nonce: Date.now() });
+  const onLongPress = useCallback((n: Note) => setMenuNote(n), []);
 
-  const onLongPress = useCallback((item: Item) => setMenuItem(item), []);
-
-  const menuActions: MenuAction[] = menuItem
+  const menuActions: MenuAction[] = menuNote
     ? [
-        { label: menuItem.is_pinned ? 'Unpin' : 'Pin to top', icon: '📌', onPress: () => togglePin(menuItem.id) },
-        ...(menuItem.due_at
-          ? [
-              { label: menuItem.is_completed ? 'Mark as not done' : 'Mark as done', icon: '✓', onPress: () => toggleComplete(menuItem.id) },
-              ...(!menuItem.is_completed ? [{ label: 'Snooze 1 hour', icon: '💤', onPress: () => snooze(menuItem.id, 60) }] : []),
-            ]
-          : []),
-        { label: 'Delete', icon: '🗑', destructive: true, onPress: () => deleteItem(menuItem.id) },
+        { label: 'Add reminder', icon: '⏰', onPress: () => openEditor({ kind: EditorKind.Existing, id: menuNote.id, addReminder: true }) },
+        { label: menuNote.is_pinned ? 'Unpin' : 'Pin to top', icon: '📌', onPress: () => togglePin(menuNote.id) },
+        { label: 'Delete note', icon: '🗑', destructive: true, onPress: () => deleteNote(menuNote.id) },
       ]
     : [];
 
-  const empty = search ? { icon: '🔍', title: 'No results', hint: `Nothing matches “${search.trim()}”.` } : EMPTY[filter];
+  const empty = search
+    ? { icon: '🔍', title: 'No results', hint: `Nothing matches “${search.trim()}”.` }
+    : { icon: '🗒️', title: folder ? `No notes in ${folder.name}` : 'No notes yet', hint: isMac ? 'Press ＋ to write a note.' : 'Tap ＋ to write a note.' };
 
   return (
     <View style={[styles.wrap, { backgroundColor: t.bg }]}>
       <View style={[styles.header, { paddingTop: isMac ? 14 : insets.top + 6, paddingLeft: insets.left + 16, paddingRight: insets.right + 12 }]}>
-        {headerLeft}
         <View style={styles.headerText}>
           <Text numberOfLines={1} style={[styles.title, { color: t.text }]} accessibilityRole="header">
-            {title}
+            {folder?.name ?? 'Notes'}
+          </Text>
+          <Text style={[styles.subtitle, { color: t.muted }]}>
+            {count} {count === 1 ? 'note' : 'notes'}
           </Text>
         </View>
         {isMac ? <IconButton testID="new-note" label="＋" size={22} accessibilityLabel="New note" onPress={newNote} /> : null}
       </View>
 
-      <View style={{ paddingLeft: insets.left + 12, paddingRight: insets.right + 12 }}>
-        <Input testID="search" placeholder="Search" value={search} onChangeText={setSearch} clearButtonMode="while-editing" autoCorrect={false} />
-        <View style={[styles.segment, { backgroundColor: t.pane }]} accessibilityRole="tablist">
-          {Object.values(ListFilter).map(f => {
-            const active = filter === f;
-            return (
-              <Pressable
-                key={f}
-                testID={`filter-${f}`}
-                accessibilityRole="tab"
-                accessibilityState={{ selected: active }}
-                onPress={() => setFilter(f)}
-                style={[styles.segmentItem, active && [styles.segmentActive, { backgroundColor: t.bg }]]}>
-                <Text style={[styles.segmentText, { color: active ? t.text : t.muted, fontWeight: active ? '700' : '500' }]}>
-                  {FILTER_LABELS[f]}
-                  {counts[f] ? <Text style={{ color: t.muted, fontWeight: '500' }}>{`  ${counts[f]}`}</Text> : null}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
+      <View style={[styles.controls, { paddingLeft: insets.left + 12, paddingRight: insets.right + 12 }]}>
+        <Input testID="search" placeholder="Search notes" value={search} onChangeText={setSearch} clearButtonMode="while-editing" autoCorrect={false} style={styles.search} />
       </View>
+      {!isMac ? <FolderChips /> : null}
 
       <ErrorBanner />
 
       <SectionList
         sections={sections}
-        keyExtractor={i => i.id}
-        renderItem={({ item }) => <NoteRow item={item} showFolder={!folderId} onLongPress={onLongPress} />}
+        keyExtractor={n => n.id}
+        renderItem={({ item }) => <NoteRow note={item} reminders={byNote[item.id] ?? NO_REMINDERS} showFolder={!folderId} onLongPress={onLongPress} />}
         renderSectionHeader={({ section }) => (
-          <Text style={[styles.sectionTitle, { color: section.key === SectionKey.Overdue ? t.danger : t.muted, backgroundColor: t.bg }]}>{section.title}</Text>
+          <Text style={[styles.sectionTitle, { color: t.muted, backgroundColor: t.bg }]}>{section.key === SectionKey.Pinned ? '📌 Pinned' : section.title}</Text>
         )}
         stickySectionHeadersEnabled={false}
-        contentContainerStyle={sections.length === 0 ? styles.emptyContainer : { paddingBottom: insets.bottom + 110 }}
+        contentContainerStyle={sections.length === 0 ? styles.emptyContainer : { paddingBottom: bottomInset + 90 }}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
         refreshControl={isMac ? undefined : <RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={t.muted} />}
         ListEmptyComponent={<Empty icon={empty.icon} title={empty.title} hint={empty.hint} />}
       />
 
-      {!isMac ? (
-        <Pressable
-          testID="new-note"
-          accessibilityRole="button"
-          accessibilityLabel="New note"
-          onPress={newNote}
-          style={({ pressed }) => [styles.fab, { backgroundColor: t.accent, bottom: insets.bottom + 22, right: insets.right + 20, transform: [{ scale: pressed ? 0.94 : 1 }] }]}>
-          <Text style={styles.fabIcon}>＋</Text>
-        </Pressable>
-      ) : null}
-
-      <ActionMenu visible={!!menuItem} title={menuItem ? menuItem.title || firstLine(menuItem.body) || 'Note' : undefined} actions={menuActions} onClose={() => setMenuItem(null)} />
+      <ActionMenu visible={!!menuNote} title={menuNote ? noteHeadline(menuNote) : undefined} actions={menuActions} onClose={() => setMenuNote(null)} />
     </View>
+  );
+}
+
+function FolderChips() {
+  const folders = useLists();
+  const view = useStore(s => s.view);
+  const setView = useStore(s => s.setView);
+  const createList = useStore(s => s.createList);
+  const updateList = useStore(s => s.updateList);
+  const deleteList = useStore(s => s.deleteList);
+  const [creating, setCreating] = useState(false);
+  const [menuFolder, setMenuFolder] = useState<List | null>(null);
+  const [renaming, setRenaming] = useState<List | null>(null);
+  const activeId = view.kind === ViewKind.Folder ? view.id : null;
+
+  const confirmDelete = (f: List) =>
+    Alert.alert(`Delete “${f.name}”?`, 'Notes in this folder are kept.', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete Folder', style: 'destructive', onPress: () => deleteList(f.id) },
+    ]);
+
+  return (
+    <>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips} keyboardShouldPersistTaps="handled" style={styles.chipBar}>
+        <Chip testID="folder-all" label="All" active={!activeId} onPress={() => setView({ kind: ViewKind.Notes })} />
+        {folders.map(f => (
+          <Chip
+            key={f.id}
+            testID={`folder-${f.name}`}
+            label={f.name}
+            color={f.color}
+            active={activeId === f.id}
+            onPress={() => setView({ kind: ViewKind.Folder, id: f.id })}
+            onLongPress={() => setMenuFolder(f)}
+          />
+        ))}
+        <Chip testID="add-folder" label="＋ Folder" onPress={() => setCreating(true)} dashed />
+      </ScrollView>
+      <PromptSheet
+        visible={creating}
+        title="New folder"
+        placeholder="Folder name"
+        initialValue=""
+        confirmLabel="Create"
+        onCancel={() => setCreating(false)}
+        onConfirm={name => {
+          setCreating(false);
+          createList(name, LIST_COLORS[folders.length % LIST_COLORS.length]);
+        }}
+      />
+      <PromptSheet
+        visible={!!renaming}
+        title="Rename folder"
+        initialValue={renaming?.name ?? ''}
+        confirmLabel="Save"
+        onCancel={() => setRenaming(null)}
+        onConfirm={name => {
+          if (renaming) {
+            updateList(renaming.id, { name });
+          }
+          setRenaming(null);
+        }}
+      />
+      <ActionMenu
+        visible={!!menuFolder}
+        title={menuFolder?.name}
+        onClose={() => setMenuFolder(null)}
+        actions={
+          menuFolder
+            ? [
+                { label: 'Rename', icon: '✎', onPress: () => setRenaming(menuFolder) },
+                { label: 'Delete Folder', icon: '🗑', destructive: true, onPress: () => confirmDelete(menuFolder) },
+              ]
+            : []
+        }
+      />
+    </>
+  );
+}
+
+function Chip({ label, active, color, dashed, onPress, onLongPress, testID }: { label: string; active?: boolean; color?: string; dashed?: boolean; onPress: () => void; onLongPress?: () => void; testID?: string }) {
+  const t = useTheme();
+  return (
+    <Pressable
+      testID={testID}
+      accessibilityRole="button"
+      accessibilityState={{ selected: !!active }}
+      onPress={onPress}
+      onLongPress={onLongPress}
+      hitSlop={{ top: 5, bottom: 5 }}
+      style={({ pressed }) => [
+        styles.chip,
+        dashed && styles.chipDashed,
+        { backgroundColor: active ? t.text : t.pane, borderColor: t.border, opacity: pressed ? 0.7 : 1 },
+      ]}>
+      {color ? <View style={[styles.dot, { backgroundColor: color }]} /> : null}
+      <Text style={[styles.chipText, { color: active ? t.bg : dashed ? t.accent : t.text }]}>{label}</Text>
+    </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
   wrap: { flex: 1 },
-  header: { flexDirection: 'row', alignItems: 'center', paddingBottom: 10 },
+  header: { flexDirection: 'row', alignItems: 'center', paddingBottom: 8 },
   headerText: { flex: 1, minWidth: 0 },
   title: { fontSize: 30, fontWeight: '800', letterSpacing: -0.5 },
-  segment: { flexDirection: 'row', borderRadius: 10, padding: 3, marginTop: 10, marginBottom: 6 },
-  segmentItem: { flex: 1, alignItems: 'center', paddingVertical: 7, borderRadius: 8 },
-  segmentActive: { shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 3, shadowOffset: { width: 0, height: 1 } },
-  segmentText: { fontSize: 13 },
+  subtitle: { fontSize: 13, fontWeight: '600', marginTop: 1 },
+  controls: { paddingBottom: 4 },
+  search: { paddingVertical: 8 },
+  chipBar: { flexGrow: 0 },
+  chips: { gap: 8, paddingHorizontal: 12, paddingVertical: 6 },
+  chip: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, minHeight: 34, borderRadius: 17 },
+  chipDashed: { borderWidth: 1, borderStyle: 'dashed' },
+  chipText: { fontSize: 13, fontWeight: '600' },
+  dot: { width: 8, height: 8, borderRadius: 4 },
   sectionTitle: { fontSize: 11, fontWeight: '700', letterSpacing: 0.5, paddingHorizontal: 18, paddingTop: 12, paddingBottom: 3, textTransform: 'uppercase' },
   emptyContainer: { flexGrow: 1 },
-  fab: {
-    position: 'absolute',
-    width: 58,
-    height: 58,
-    borderRadius: 29,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOpacity: 0.25,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 5 },
-  },
-  fabIcon: { color: '#fff', fontSize: 30, lineHeight: 34, fontWeight: '400' },
 });

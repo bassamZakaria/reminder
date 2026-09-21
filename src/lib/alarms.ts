@@ -1,11 +1,12 @@
 import { NativeEventEmitter, NativeModules, Platform } from 'react-native';
-import { AlertType, RepeatRule, type Item } from '../types';
+import { AlertType, RepeatRule, type Note, type Reminder } from '../types';
 import { desiredSchedules, signature, SNOOZE_SUFFIX, type ScheduleRequest } from './schedule';
 
 interface NativeAlarms {
   requestPermission(): Promise<boolean>;
   requestAlarmPermission(): Promise<boolean>;
   alarmsSupported(): Promise<boolean>;
+  alarmPermissionStatus?(): Promise<boolean>;
   schedule(identifier: string, itemId: string, title: string, body: string, fireAt: number, repeat: RepeatRule, alertType: AlertType): Promise<void>;
   cancel(identifiers: string[]): void;
   cancelAll(): void;
@@ -27,6 +28,7 @@ export interface NotificationActionEvent {
   eventId?: string;
   itemId: string;
   action: string;
+  snoozeUntil?: number;
 }
 export interface AlarmFiredEvent {
   itemId: string;
@@ -35,7 +37,7 @@ export interface AlarmFiredEvent {
 }
 
 const native: NativeAlarms | undefined = NativeModules.AlarmNotifications;
-const supported = (Platform.OS === 'ios' || Platform.OS === 'macos') && !!native;
+const supported = (Platform.OS === 'ios' || Platform.OS === 'macos' || Platform.OS === 'android') && !!native;
 const emitter = supported ? new NativeEventEmitter(native as never) : null;
 
 const scheduled = new Map<string, string>();
@@ -52,6 +54,10 @@ export const alarms = {
 
   async requestAlarmPermission(): Promise<boolean> {
     return supported ? native!.requestAlarmPermission() : false;
+  },
+
+  async alarmPermissionStatus(): Promise<boolean | null> {
+    return supported && native!.alarmPermissionStatus ? native!.alarmPermissionStatus() : null;
   },
 
   async nativeAlarmsSupported(): Promise<boolean> {
@@ -80,11 +86,11 @@ export const alarms = {
     }
   },
 
-  async scheduleOnce(identifier: string, itemId: string, title: string, body: string, fireAt: Date, alertType: AlertType): Promise<void> {
+  async scheduleOnce(identifier: string, reminderId: string, title: string, body: string, fireAt: Date, alertType: AlertType): Promise<void> {
     if (!supported) {
       return;
     }
-    await native!.schedule(identifier, itemId, title, body, fireAt.getTime(), RepeatRule.None, alertType);
+    await native!.schedule(identifier, reminderId, title, body, fireAt.getTime(), RepeatRule.None, alertType);
   },
 
   async scheduleTest(fireAt: Date, alertType: AlertType): Promise<void> {
@@ -120,11 +126,11 @@ export const alarms = {
     }
   },
 
-  async sync(items: Item[], now = new Date()): Promise<void> {
+  async sync(reminders: Reminder[], notes: Record<string, Note>, now = new Date()): Promise<void> {
     if (!supported) {
       return;
     }
-    const desired = desiredSchedules(items, now);
+    const desired = desiredSchedules(reminders, notes, now);
     const desiredIds = new Set(desired.map(d => d.identifier));
     const pending = await native!.getPending();
     const stale = pending.filter(id => !id.startsWith(TEST_PREFIX) && !desiredIds.has(id.endsWith(SNOOZE_SUFFIX) ? id.slice(0, -SNOOZE_SUFFIX.length) : id));
@@ -145,5 +151,5 @@ export const alarms = {
 };
 
 async function scheduleRequest(req: ScheduleRequest) {
-  await native!.schedule(req.identifier, req.itemId, req.title, req.body, req.fireAt, req.repeat, req.alertType);
+  await native!.schedule(req.identifier, req.reminderId, req.title, req.body, req.fireAt, req.repeat, req.alertType);
 }

@@ -28,8 +28,8 @@ export function Button({
   testID?: string;
 }) {
   const t = useTheme();
-  const bg = { [ButtonKind.Primary]: t.accent, [ButtonKind.Danger]: t.danger, [ButtonKind.Ghost]: 'transparent', [ButtonKind.Secondary]: t.input }[kind];
-  const color = { [ButtonKind.Primary]: '#fff', [ButtonKind.Danger]: '#fff', [ButtonKind.Ghost]: t.accent, [ButtonKind.Secondary]: t.text }[kind];
+  const bg = { [ButtonKind.Primary]: t.accentFill, [ButtonKind.Danger]: t.danger, [ButtonKind.Ghost]: 'transparent', [ButtonKind.Secondary]: t.input }[kind];
+  const color = { [ButtonKind.Primary]: t.onAccent, [ButtonKind.Danger]: '#fff', [ButtonKind.Ghost]: t.accent, [ButtonKind.Secondary]: t.text }[kind];
   return (
     <Pressable
       testID={testID}
@@ -181,9 +181,8 @@ export function PromptSheet({
 
 const TOAST_MS = 4500;
 
-export function ToastHost() {
+export function ToastHost({ bottomInset }: { bottomInset: number }) {
   const t = useTheme();
-  const insets = useSafeAreaInsets();
   const toast = useStore(s => s.toast);
   const dismissToast = useStore(s => s.dismissToast);
   const undoDelete = useStore(s => s.undoDelete);
@@ -206,14 +205,14 @@ export function ToastHost() {
   return (
     <Animated.View
       pointerEvents="box-none"
-      style={[styles.toastWrap, { bottom: insets.bottom + (isMac ? 20 : 90), opacity: anim, transform: [{ translateY }] }]}>
+      style={[styles.toastWrap, { bottom: isMac ? 20 : bottomInset + 84, opacity: anim, transform: [{ translateY }] }]}>
       <View style={[styles.toast, { backgroundColor: t.toast }]} accessibilityLiveRegion="polite">
         <Text numberOfLines={2} style={[styles.toastText, { color: t.toastText }]}>
           {toast.message}
         </Text>
-        {toast.undoItem ? (
-          <Pressable testID="toast-undo" accessibilityRole="button" onPress={undoDelete} hitSlop={10}>
-            <Text style={[styles.toastAction, { color: t.accent }]}>Undo</Text>
+        {toast.undo ? (
+          <Pressable testID="toast-undo" accessibilityRole="button" accessibilityLabel="Undo" onPress={undoDelete} hitSlop={14}>
+            <Text style={[styles.toastAction, { color: t.toastAction }]}>Undo</Text>
           </Pressable>
         ) : null}
       </View>
@@ -249,7 +248,7 @@ const styles = StyleSheet.create({
   button: { paddingHorizontal: 18, paddingVertical: 12, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   buttonText: { fontWeight: '600', fontSize: 15 },
   input: { borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 15 },
-  iconButton: { paddingHorizontal: 6, paddingVertical: 4 },
+  iconButton: { minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 },
   emptyIcon: { width: 72, height: 72, borderRadius: 36, alignItems: 'center', justifyContent: 'center', marginBottom: 14 },
   emptyGlyph: { fontSize: 32 },

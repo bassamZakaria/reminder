@@ -51,8 +51,8 @@ export function AlarmScreen() {
           <Pressable onPress={() => snoozeAlarm(10)} style={({ pressed }) => [styles.snooze, { borderColor: t.border, opacity: pressed ? 0.6 : 1 }]}>
             <Text style={{ color: t.textSecondary, fontSize: 16, fontWeight: '600' }}>Snooze 10 min</Text>
           </Pressable>
-          <Pressable onPress={dismissAlarm} style={({ pressed }) => [styles.stop, { backgroundColor: t.accent, opacity: pressed ? 0.8 : 1 }]}>
-            <Text style={{ color: '#fff', fontSize: 18, fontWeight: '700' }}>Stop</Text>
+          <Pressable onPress={dismissAlarm} style={({ pressed }) => [styles.stop, { backgroundColor: t.accentFill, opacity: pressed ? 0.8 : 1 }]}>
+            <Text style={{ color: t.onAccent, fontSize: 18, fontWeight: '700' }}>Stop</Text>
           </Pressable>
         </View>
       </View>

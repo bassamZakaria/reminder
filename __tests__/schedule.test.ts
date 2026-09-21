@@ -1,19 +1,28 @@
-import { addRepeat, daysBetween, desiredSchedules, firstLine, nextOccurrence } from '../src/lib/schedule';
-import { AlertType, RepeatRule, type Item } from '../src/types';
+import { addRepeat, daysBetween, desiredSchedules, firstLine, nextAfterCompletion, nextOccurrence, noteHeadline } from '../src/lib/schedule';
+import { AlertType, RepeatRule, type Note, type Reminder } from '../src/types';
 
-function item(patch: Partial<Item>): Item {
+const NOTE: Note = {
+  id: 'n1',
+  user_id: 'u',
+  list_id: null,
+  title: 'Pay rent',
+  body: 'Transfer to landlord\nRef 42',
+  is_pinned: false,
+  created_at: '2026-01-01T00:00:00Z',
+  updated_at: '2026-01-01T00:00:00Z',
+};
+const NOTES = { n1: NOTE };
+
+function reminder(patch: Partial<Reminder>): Reminder {
   return {
-    id: 'a',
+    id: 'r1',
     user_id: 'u',
-    list_id: null,
-    title: 'Pay rent',
-    body: '',
-    due_at: null,
+    note_id: 'n1',
+    due_at: '2026-05-11T09:00:00Z',
     repeat_rule: RepeatRule.None,
     alert_type: AlertType.Notification,
     is_completed: false,
     completed_at: null,
-    is_pinned: false,
     created_at: '2026-01-01T00:00:00Z',
     updated_at: '2026-01-01T00:00:00Z',
     ...patch,
@@ -58,37 +67,58 @@ describe('nextOccurrence', () => {
 describe('desiredSchedules', () => {
   const now = new Date(2026, 4, 10, 12, 0);
 
-  it('skips notes, completed items and past one-off reminders', () => {
-    const items = [
-      item({ id: 'note' }),
-      item({ id: 'done', due_at: new Date(2026, 4, 11).toISOString(), is_completed: true }),
-      item({ id: 'past', due_at: new Date(2026, 4, 9).toISOString() }),
-      item({ id: 'future', due_at: new Date(2026, 4, 11, 9).toISOString() }),
+  it('skips completed and past one-off reminders', () => {
+    const reminders = [
+      reminder({ id: 'done', due_at: new Date(2026, 4, 11).toISOString(), is_completed: true }),
+      reminder({ id: 'past', due_at: new Date(2026, 4, 9).toISOString() }),
+      reminder({ id: 'future', due_at: new Date(2026, 4, 11, 9).toISOString() }),
     ];
-    expect(desiredSchedules(items, now).map(r => r.identifier)).toEqual(['future']);
+    expect(desiredSchedules(reminders, NOTES, now).map(r => r.identifier)).toEqual(['future']);
+  });
+
+  it('uses the note title and first body line as the alert text', () => {
+    const [req] = desiredSchedules([reminder({ due_at: new Date(2026, 4, 11).toISOString() })], NOTES, now);
+    expect([req.title, req.body]).toEqual(['Pay rent', 'Transfer to landlord']);
   });
 
   it('arms a future first occurrence of a repeating reminder as a one-shot', () => {
-    const [req] = desiredSchedules([item({ due_at: new Date(2026, 4, 11, 9).toISOString(), repeat_rule: RepeatRule.Weekly })], now);
+    const [req] = desiredSchedules([reminder({ due_at: new Date(2026, 4, 11, 9).toISOString(), repeat_rule: RepeatRule.Weekly })], NOTES, now);
     expect(req.repeat).toBe(RepeatRule.None);
   });
 
   it('arms a past repeating reminder as a repeating trigger at its next occurrence', () => {
-    const [req] = desiredSchedules([item({ due_at: new Date(2026, 4, 1, 9).toISOString(), repeat_rule: RepeatRule.Daily, alert_type: AlertType.Alarm })], now);
+    const [req] = desiredSchedules([reminder({ due_at: new Date(2026, 4, 1, 9).toISOString(), repeat_rule: RepeatRule.Daily, alert_type: AlertType.Alarm })], NOTES, now);
     expect(req.repeat).toBe(RepeatRule.Daily);
     expect(req.alertType).toBe(AlertType.Alarm);
     expect(new Date(req.fireAt).getDate()).toBe(11);
   });
 
-  it('falls back to a generic title', () => {
-    const [req] = desiredSchedules([item({ title: '', due_at: new Date(2026, 4, 11).toISOString() })], now);
-    expect(req.title).toBe('Reminder');
+  it('schedules every reminder of a note separately', () => {
+    const reqs = desiredSchedules(
+      [reminder({ id: 'a', due_at: new Date(2026, 4, 11).toISOString() }), reminder({ id: 'b', due_at: new Date(2026, 4, 12).toISOString() })],
+      NOTES,
+      now,
+    );
+    expect(reqs.map(r => r.identifier)).toEqual(['a', 'b']);
+  });
+});
+
+describe('nextAfterCompletion', () => {
+  it('moves a future repeating reminder one full period ahead', () => {
+    const due = new Date(2026, 4, 11, 9);
+    const next = nextAfterCompletion({ due_at: due.toISOString(), repeat_rule: RepeatRule.Weekly }, new Date(2026, 4, 10));
+    expect(next.getDate()).toBe(18);
   });
 });
 
 describe('helpers', () => {
   it('firstLine skips blank lines and trims', () => {
     expect(firstLine('\n\n  hello world  \nsecond')).toBe('hello world');
+  });
+
+  it('noteHeadline falls back to the first body line, then a default', () => {
+    expect(noteHeadline({ title: '', body: '\nBuy milk\nand eggs' })).toBe('Buy milk');
+    expect(noteHeadline(undefined)).toBe('Reminder');
   });
 
   it('daysBetween counts calendar days', () => {

@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useItems, useLists, useStore } from '../store/useStore';
+import { useLists, useNotes, useReminders, useStore } from '../store/useStore';
 import { LIST_COLORS, ViewKind, type List, type View as AppView } from '../types';
 import { ActionMenu, Input, PromptSheet } from './common';
 import { isMac, useTheme } from './theme';
@@ -15,6 +15,7 @@ function NavItem({
   icon,
   label,
   count,
+  alert,
   color,
   onPress,
   onLongPress,
@@ -24,6 +25,7 @@ function NavItem({
   icon?: string;
   label: string;
   count?: number;
+  alert?: number;
   color?: string;
   onPress: () => void;
   onLongPress?: () => void;
@@ -45,6 +47,11 @@ function NavItem({
       <Text numberOfLines={1} style={[styles.navLabel, { color: t.text, fontWeight: active ? '700' : '500' }]}>
         {label}
       </Text>
+      {alert ? (
+        <View style={[styles.alert, { backgroundColor: t.danger }]}>
+          <Text style={styles.alertText}>{alert}</Text>
+        </View>
+      ) : null}
       {count ? <Text style={[styles.count, { color: t.muted }]}>{count}</Text> : null}
     </Pressable>
   );
@@ -52,7 +59,8 @@ function NavItem({
 
 export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   const t = useTheme();
-  const items = useItems();
+  const notes = useNotes();
+  const reminders = useReminders();
   const folders = useLists();
   const view = useStore(s => s.view);
   const setView = useStore(s => s.setView);
@@ -68,14 +76,18 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
 
   const counts = useMemo(() => {
     const out: Record<string, number> = {};
-    for (const i of items) {
-      if (!i.is_completed && i.list_id) {
-        out[i.list_id] = (out[i.list_id] ?? 0) + 1;
+    for (const n of notes) {
+      if (n.list_id) {
+        out[n.list_id] = (out[n.list_id] ?? 0) + 1;
       }
     }
     return out;
-  }, [items]);
-  const openCount = useMemo(() => items.filter(i => !i.is_completed).length, [items]);
+  }, [notes]);
+  const openReminders = useMemo(() => reminders.filter(r => !r.is_completed), [reminders]);
+  const overdue = useMemo(() => {
+    const now = Date.now();
+    return openReminders.filter(r => new Date(r.due_at).getTime() < now).length;
+  }, [openReminders]);
 
   const go = (v: AppView) => {
     setView(v);
@@ -92,7 +104,7 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   };
 
   const confirmDelete = (f: List) => {
-    Alert.alert(`Delete “${f.name}”?`, 'Notes in this folder are kept and moved to All Notes.', [
+    Alert.alert(`Delete “${f.name}”?`, 'Notes in this folder are kept.', [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Delete Folder', style: 'destructive', onPress: () => deleteList(f.id) },
     ]);
@@ -102,7 +114,8 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
     <View style={[styles.sidebar, { backgroundColor: t.sidebar, borderRightColor: t.border }]}>
       <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingTop: isMac ? 34 : insets.top + 12, paddingBottom: insets.bottom + 16 }}>
         {!isMac ? <Text style={[styles.brand, { color: t.text }]}>Recall</Text> : null}
-        <NavItem testID="nav-all" active={sameView(view, { kind: ViewKind.All })} icon="🗒️" label="All Notes" count={openCount} onPress={() => go({ kind: ViewKind.All })} />
+        <NavItem testID="nav-reminders" active={sameView(view, { kind: ViewKind.Reminders })} icon="⏰" label="Reminders" count={openReminders.length} alert={overdue} onPress={() => go({ kind: ViewKind.Reminders })} />
+        <NavItem testID="nav-notes" active={sameView(view, { kind: ViewKind.Notes })} icon="🗒️" label="Notes" count={notes.length} onPress={() => go({ kind: ViewKind.Notes })} />
 
         <View style={styles.groupRow}>
           <Text style={[styles.groupLabel, { color: t.muted }]}>FOLDERS</Text>
@@ -188,6 +201,8 @@ const styles = StyleSheet.create({
   nav: { flexDirection: 'row', alignItems: 'center', marginHorizontal: 8, paddingVertical: isMac ? 7 : 11, paddingHorizontal: 10, borderRadius: 9 },
   navLabel: { flex: 1, fontSize: isMac ? 14 : 16 },
   count: { fontSize: 13 },
+  alert: { minWidth: 18, height: 18, borderRadius: 9, paddingHorizontal: 5, alignItems: 'center', justifyContent: 'center', marginRight: 6 },
+  alertText: { color: '#fff', fontSize: 11, fontWeight: '800' },
   icon: { fontSize: 14, width: 24 },
   dot: { width: 10, height: 10, borderRadius: 5, marginLeft: 3, marginRight: 11 },
   addBox: { paddingHorizontal: 12, paddingBottom: 10 },

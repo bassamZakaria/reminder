@@ -3,12 +3,11 @@ name: 05_settings
 ---
 - launchApp
 - extendedWaitUntil:
-    visible: "All Notes"
+    visible:
+      id: "tab-settings"
     timeout: 15000
 - tapOn:
-    id: "menu"
-- tapOn:
-    id: "nav-settings"
+    id: "tab-settings"
 - assertVisible: "Settings"
 - assertVisible: ${EMAIL}
 - assertVisible: "Allowed"
@@ -16,6 +15,9 @@ name: 05_settings
     id: "test-notification"
 - assertVisible: "Test notification in 5 seconds.*"
 - takeScreenshot: screenshots/05-settings
+- scrollUntilVisible:
+    element:
+      id: "sign-out"
 - tapOn:
     id: "sign-out"
 - tapOn: "Cancel"

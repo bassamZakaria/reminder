@@ -116,8 +116,8 @@ export function DateTimeSheet({ visible, value, onCancel, onConfirm }: { visible
               const past = startOfDayTs(d) < startOfDayTs(now);
               return (
                 <Pressable key={d.toISOString()} accessibilityRole="button" accessibilityLabel={d.toDateString()} onPress={() => setDay(d)} style={styles.cell}>
-                  <View style={[styles.day, selected && { backgroundColor: t.accent }]}>
-                    <Text style={{ color: selected ? '#fff' : past ? t.check : inMonth ? t.text : t.muted, fontSize: 15, fontWeight: today && !selected ? '700' : '400' }}>{d.getDate()}</Text>
+                  <View style={[styles.day, selected && { backgroundColor: t.accentFill }]}>
+                    <Text style={{ color: selected ? t.onAccent : past ? t.check : inMonth ? t.text : t.muted, fontSize: 15, fontWeight: today && !selected ? '700' : '400' }}>{d.getDate()}</Text>
                   </View>
                   {today && !selected ? <View style={[styles.todayDot, { backgroundColor: t.accent }]} /> : null}
                 </Pressable>
@@ -136,7 +136,7 @@ export function DateTimeSheet({ visible, value, onCancel, onConfirm }: { visible
                   const active = (label === Meridiem.PM) === pm;
                   return (
                     <Pressable key={label} onPress={() => setTime(hour12, draft.getMinutes(), label === Meridiem.PM)} style={[styles.ampmButton, active && { backgroundColor: t.accent }]}>
-                      <Text style={{ color: active ? '#fff' : t.textSecondary, fontSize: 13, fontWeight: '600' }}>{label}</Text>
+                      <Text style={{ color: active ? t.onAccent : t.textSecondary, fontSize: 13, fontWeight: '600' }}>{label}</Text>
                     </Pressable>
                   );
                 })}
@@ -155,8 +155,8 @@ export function DateTimeSheet({ visible, value, onCancel, onConfirm }: { visible
               accessibilityRole="button"
               disabled={inPast}
               onPress={() => onConfirm(draft)}
-              style={({ pressed }) => [styles.confirm, { backgroundColor: t.accent, opacity: inPast ? 0.4 : pressed ? 0.8 : 1 }]}>
-              <Text style={{ color: '#fff', fontSize: 15, fontWeight: '700' }}>
+              style={({ pressed }) => [styles.confirm, { backgroundColor: t.accentFill, opacity: inPast ? 0.4 : pressed ? 0.8 : 1 }]}>
+              <Text style={{ color: t.onAccent, fontSize: 15, fontWeight: '700' }}>
                 {draft.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} at {draft.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}
               </Text>
             </Pressable>
@@ -241,15 +241,15 @@ const styles = StyleSheet.create({
   grabber: { alignItems: 'center', paddingVertical: 8 },
   grabberBar: { width: 38, height: 4, borderRadius: 2 },
   quickRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 10 },
-  quickChip: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 14 },
+  quickChip: { paddingHorizontal: 14, minHeight: 36, justifyContent: 'center', borderRadius: 18 },
   quickText: { fontSize: 13, fontWeight: '600' },
   warning: { fontSize: 13, textAlign: 'center', marginTop: 10 },
   monthRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 6 },
   weekRow: { flexDirection: 'row' },
   weekday: { flex: 1, textAlign: 'center', fontSize: 11, fontWeight: '600', paddingBottom: 4 },
   grid: { flexDirection: 'row', flexWrap: 'wrap' },
-  cell: { width: '14.28%', alignItems: 'center', paddingVertical: 2 },
-  day: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
+  cell: { width: '14.28%', alignItems: 'center', paddingVertical: 1, minHeight: 44 },
+  day: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
   todayDot: { width: 4, height: 4, borderRadius: 2, marginTop: 1 },
   timeRow: { borderTopWidth: StyleSheet.hairlineWidth, marginTop: 10, paddingTop: 10 },
   wheels: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', height: ITEM_HEIGHT * 3 },
@@ -258,7 +258,7 @@ const styles = StyleSheet.create({
   wheelItem: { height: ITEM_HEIGHT, alignItems: 'center', justifyContent: 'center' },
   colon: { fontSize: 20, fontWeight: '700', marginHorizontal: 2 },
   ampm: { marginLeft: 14, gap: 6 },
-  ampmButton: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 },
+  ampmButton: { paddingHorizontal: 14, minHeight: 36, justifyContent: 'center', borderRadius: 8 },
   actions: { flexDirection: 'row', gap: 10, marginTop: 14 },
   cancel: { flex: 1, borderWidth: StyleSheet.hairlineWidth, borderRadius: 12, paddingVertical: 13, alignItems: 'center' },
   confirm: { flex: 2, borderRadius: 12, paddingVertical: 13, alignItems: 'center' },

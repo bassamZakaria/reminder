@@ -3,17 +3,15 @@ name: 03_reminders
 ---
 - launchApp
 - extendedWaitUntil:
-    visible: "All Notes"
+    visible:
+      id: "tab-reminders"
     timeout: 15000
 - tapOn:
-    id: "new-note"
-- waitForAnimationToEnd
+    id: "tab-reminders"
+
+# New reminder from the Reminders tab opens the date picker straight away
 - tapOn:
-    id: "note-title"
-- inputText: "Dentist"
-- hideKeyboard
-- tapOn:
-    id: "reminder-switch"
+    id: "new-reminder"
 - extendedWaitUntil:
     visible:
       id: "date-confirm"
@@ -22,78 +20,119 @@ name: 03_reminders
 - tapOn: "Tomorrow 9 AM"
 - tapOn:
     id: "date-confirm"
+- waitForAnimationToEnd
 - assertVisible: ".*Tomorrow, 9:00.AM.*"
 - tapOn:
+    id: "note-title"
+- inputText: "Dentist"
+- tapOn:
+    id: "note-body"
+- inputText: "Bring the insurance card"
+
+# A second reminder on the same note
+- tapOn:
+    id: "add-reminder"
+- extendedWaitUntil:
+    visible:
+      id: "date-confirm"
+    timeout: 5000
+- tapOn: "Next week"
+- tapOn:
+    id: "date-confirm"
+- waitForAnimationToEnd
+
+# First reminder: alarm, weekly
+- tapOn:
     id: "alert-toggle"
+    index: 0
 - runFlow: ../subflows/system_prompts.yaml
 - assertVisible: ".*Alarm"
 - tapOn:
     id: "repeat-pill"
+    index: 0
 - tapOn: "Weekly"
 - assertVisible: ".*Weekly"
-- takeScreenshot: screenshots/03-editor-reminder
+- takeScreenshot: screenshots/03-editor-reminders
 - tapOn:
     id: "editor-done"
-- assertVisible:
-    id: "row-Dentist"
 
-# Reminders filter groups by day
-- tapOn:
-    id: "filter-reminders"
+# Both reminders show in the list, grouped by day
 - assertVisible: "Tomorrow"
-- assertVisible:
-    id: "row-Dentist"
+- assertVisible: "Later"
 - takeScreenshot: screenshots/03-reminders
 
-# One-off reminder: complete it from the list
+# Tapping a reminder shows its note inline
 - tapOn:
-    id: "filter-all"
+    id: "reminder-Dentist"
+    index: 0
+- assertVisible:
+    id: "reminder-note-body"
+- assertVisible: "Bring the insurance card"
+- takeScreenshot: screenshots/03-reminder-expanded
 - tapOn:
-    id: "new-note"
+    id: "reminder-open"
+- waitForAnimationToEnd
+- assertVisible:
+    id: "editor-reminder"
+    index: 1
+- tapOn:
+    id: "editor-done"
+
+# A one-off reminder, completed from the list
+- tapOn:
+    id: "new-reminder"
+- extendedWaitUntil:
+    visible:
+      id: "date-confirm"
+    timeout: 5000
+- tapOn: "Next week"
+- tapOn:
+    id: "date-confirm"
 - waitForAnimationToEnd
 - tapOn:
     id: "note-title"
 - inputText: "Take out trash"
-- hideKeyboard
-- tapOn:
-    id: "reminder-switch"
-- tapOn: "Next week"
-- tapOn:
-    id: "date-confirm"
 - tapOn:
     id: "editor-done"
 - tapOn:
     id: "complete-Take out trash"
 - assertNotVisible:
-    id: "row-Take out trash"
+    id: "reminder-Take out trash"
 - tapOn:
     id: "filter-done"
 - assertVisible:
-    id: "row-Take out trash"
+    id: "reminder-Take out trash"
 - takeScreenshot: screenshots/03-done
-
-# Repeating reminder completes to its next occurrence
 - tapOn:
-    id: "filter-reminders"
+    id: "filter-upcoming"
+
+# Completing the weekly reminder moves it on instead of finishing it
 - tapOn:
     id: "complete-Dentist"
+    index: 0
 - extendedWaitUntil:
     visible: "Next:.*"
     timeout: 5000
-- assertVisible:
-    id: "row-Dentist"
-- assertNotVisible: ".*Tomorrow, 9:00.AM.*"
 
-# Turning the reminder off turns it back into a plain note
+# The Notes tab shows each note's reminders
+- tapOn:
+    id: "tab-notes"
+- assertVisible: "Dentist, Bring the insurance card, reminder.*reminder.*"
+- takeScreenshot: screenshots/03-notes-with-reminders
+
+# Removing one reminder keeps the note and the other reminder
 - tapOn:
     id: "row-Dentist"
 - waitForAnimationToEnd
 - tapOn:
-    id: "reminder-switch"
-- assertVisible: ".*Get an alert at a set time.*"
+    id: "reminder-delete"
+    index: 0
+- assertNotVisible:
+    id: "editor-reminder"
+    index: 1
+- assertVisible:
+    id: "editor-reminder"
 - tapOn:
     id: "editor-done"
-- assertNotVisible:
+- assertVisible:
     id: "row-Dentist"
-- tapOn:
-    id: "filter-all"

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # One-time provisioning: creates a free Supabase project, applies the schema,
-# creates your login user, locks sign-ups, and writes app.config.json for the app.
+# optionally creates a demo login for app reviewers, and writes app.config.json for the app.
 # Prerequisite: SUPABASE_ACCESS_TOKEN exported (https://supabase.com/dashboard/account/tokens).
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -11,10 +11,6 @@ REGION="${REGION:-eu-central-1}"
 
 if [ -z "${SUPABASE_ACCESS_TOKEN:-}" ]; then
   echo "SUPABASE_ACCESS_TOKEN is not set. Create one at https://supabase.com/dashboard/account/tokens" >&2
-  exit 1
-fi
-if [ -z "${USER_EMAIL:-}" ] || [ -z "${USER_PASSWORD:-}" ]; then
-  echo "USER_EMAIL and USER_PASSWORD are required (sign-ups are disabled, this is the only account)." >&2
   exit 1
 fi
 
@@ -62,7 +58,12 @@ SERVICE_KEY="$(echo "$KEYS_JSON" | json_field '(k=>(k.find(x=>x.name==="service_
 URL="https://$REF.supabase.co"
 
 cat > app.config.json <<JSON
-{ "supabaseUrl": "$URL", "supabaseAnonKey": "$ANON_KEY" }
+{
+  "supabaseUrl": "$URL",
+  "supabaseAnonKey": "$ANON_KEY",
+  "privacyPolicyUrl": "${PRIVACY_POLICY_URL:-}",
+  "supportUrl": "${SUPPORT_URL:-}"
+}
 JSON
 echo "==> Wrote app.config.json"
 
@@ -81,12 +82,14 @@ create_user() {
   fi
   rm -f /tmp/recall-create-user.json
 }
-create_user "$USER_EMAIL" "$USER_PASSWORD"
+if [ -n "${DEMO_EMAIL:-}" ] && [ -n "${DEMO_PASSWORD:-}" ]; then
+  create_user "$DEMO_EMAIL" "$DEMO_PASSWORD"
+fi
 
-echo "==> Disabling public sign-ups"
+echo "==> Configuring auth: public sign-ups with email confirmation, 8+ character passwords"
 curl -sS -f -o /dev/null -X PATCH "https://api.supabase.com/v1/projects/$REF/config/auth" \
   -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" -H "Content-Type: application/json" \
-  -d '{"disable_signup": true}'
+  -d '{"disable_signup": false, "mailer_autoconfirm": false, "password_min_length": 8}'
 
 if command -v gh >/dev/null && gh repo view >/dev/null 2>&1; then
   echo "==> Setting GitHub secrets for the keep-alive workflow"

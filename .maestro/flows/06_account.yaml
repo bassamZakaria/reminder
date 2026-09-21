@@ -1,0 +1,66 @@
+appId: com.bassamsalah.recall
+name: 06_account
+---
+- launchApp:
+    clearState: true
+    permissions:
+      notifications: allow
+- runFlow: ../subflows/system_prompts.yaml
+- extendedWaitUntil:
+    visible:
+      id: "email"
+    timeout: 20000
+
+# Sign up from inside the app
+- tapOn:
+    id: "switch-mode"
+- assertVisible: "Create your account"
+- tapOn:
+    id: "email"
+- inputText: "newuser@recall.local"
+- assertVisible:
+    text: "Create account"
+    enabled: false
+- tapOn: "Show password"
+- tapOn:
+    id: "password"
+- inputText: "long-enough-password"
+- tapOn:
+    id: "sign-in"
+- runFlow: ../subflows/system_prompts.yaml
+- extendedWaitUntil:
+    visible:
+      id: "tab-reminders"
+    timeout: 15000
+- assertVisible: "You.re all caught up"
+
+# Delete the account from Settings
+- tapOn:
+    id: "tab-settings"
+- scrollUntilVisible:
+    element:
+      id: "delete-account"
+- tapOn:
+    id: "delete-account"
+- assertVisible: "Delete your account?"
+- takeScreenshot: screenshots/06-delete-confirm
+- tapOn:
+    text: "Delete Account"
+    above: "Cancel"
+- extendedWaitUntil:
+    visible:
+      id: "email"
+    timeout: 15000
+
+# The deleted account can no longer sign in
+- tapOn:
+    id: "email"
+- inputText: "newuser@recall.local"
+- tapOn:
+    id: "password"
+- inputText: "long-enough-password"
+- tapOn:
+    id: "sign-in"
+- extendedWaitUntil:
+    visible: "Wrong email or password."
+    timeout: 10000
