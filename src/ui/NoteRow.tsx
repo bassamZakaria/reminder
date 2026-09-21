@@ -4,7 +4,7 @@ import { formatDue, formatRelative, formatReminderTime } from '../lib/dates';
 import { firstLine, isSameDay } from '../lib/schedule';
 import { EditorKind, useStore } from '../store/useStore';
 import { AlertType, RepeatRule, type Note, type Reminder } from '../types';
-import { isMac, useTheme } from './theme';
+import { isDesktop, useTheme } from './theme';
 
 const MAX_CHIPS = 2;
 
@@ -40,7 +40,7 @@ export const NoteRow = memo(function NoteRow({
       delayLongPress={350}
       style={({ pressed, hovered }: { pressed: boolean; hovered?: boolean }) => [
         styles.row,
-        { backgroundColor: selected && isMac ? t.selected : pressed || hovered ? t.hover : 'transparent' },
+        { backgroundColor: selected && isDesktop ? t.selected : pressed || hovered ? t.hover : 'transparent' },
       ]}>
       <View style={[styles.icon, { backgroundColor: open.length ? t.accentSoft : t.pane }]}>
         <Text style={[styles.glyph, { color: open.length ? t.accent : t.muted }]}>{open.length ? '⏰' : '≡'}</Text>

@@ -1,0 +1,61 @@
+appId: com.bassamsalah.recall
+name: 07_paywall
+---
+- runFlow: ../subflows/sign_in.yaml
+
+# Free users can add a notification reminder
+- tapOn:
+    id: "new-reminder"
+- extendedWaitUntil:
+    visible:
+      id: "date-confirm"
+    timeout: 5000
+- tapOn: "Tomorrow 9 AM"
+- tapOn:
+    id: "date-confirm"
+- waitForAnimationToEnd
+- tapOn:
+    id: "note-title"
+- inputText: "Free plan reminder"
+
+# Alarms are Premium: the paywall opens and the reminder stays a notification
+- tapOn:
+    id: "alert-toggle"
+- extendedWaitUntil:
+    visible:
+      id: "paywall-reason"
+    timeout: 5000
+- assertVisible: "Ringing alarms is a Premium feature."
+- assertVisible: "Recall Premium"
+- assertVisible:
+    id: "paywall-restore"
+- assertVisible: ".*renews automatically.*"
+- assertVisible: ".*renews automatically.*"
+- takeScreenshot: screenshots/07-paywall
+- tapOn:
+    id: "paywall-close"
+- assertNotVisible:
+    id: "paywall-reason"
+- assertVisible: ".*🔔 🔒.*"
+- tapOn:
+    id: "editor-done"
+    retryTapIfNoChange: true
+
+# Folders are Premium
+- tapOn:
+    id: "tab-notes"
+- tapOn:
+    id: "add-folder"
+- assertVisible: "Folders is a Premium feature."
+- tapOn:
+    id: "paywall-close"
+
+# Settings shows the free plan and a way to upgrade
+- tapOn:
+    id: "tab-settings"
+- assertVisible: "Free · 1 of 10 reminders"
+- tapOn:
+    id: "upgrade"
+- assertVisible: "Recall Premium"
+- tapOn:
+    id: "paywall-close"

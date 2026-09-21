@@ -6,8 +6,10 @@ import { byDue } from '../lib/grouping';
 import { EditorKind, useLists, useStore, type EditorTarget } from '../store/useStore';
 import { AlertType, REPEAT_LABELS, REPEAT_RULES, RepeatRule, type Reminder } from '../types';
 import { ActionMenu, type MenuAction } from './common';
+import { AlarmScreen } from './AlarmScreen';
 import { DateTimeSheet } from './DateTimeSheet';
-import { isMac, useTheme } from './theme';
+import { Paywall } from './Paywall';
+import { isDesktop, isMac, useTheme } from './theme';
 
 enum EditorMenu {
   Folder = 'folder',
@@ -38,6 +40,7 @@ export function EditorScreen({ target, onClose, expanded, onToggleExpand }: { ta
   const completeReminder = useStore(s => s.completeReminder);
   const nativeAlarms = useStore(s => s.nativeAlarms);
   const alarmPermission = useStore(s => s.alarmPermission);
+  const premium = useStore(s => s.isPremium());
   const requestAlarmPermission = useStore(s => s.requestAlarmPermission);
 
   const [title, setTitle] = useState(existing?.title ?? '');
@@ -201,7 +204,7 @@ export function EditorScreen({ target, onClose, expanded, onToggleExpand }: { ta
   const toggleAlert = async (reminder: Reminder) => {
     const next = reminder.alert_type === AlertType.Alarm ? AlertType.Notification : AlertType.Alarm;
     await updateReminder(reminder.id, { alert_type: next });
-    if (next !== AlertType.Alarm || !nativeAlarms || alarmPermission) {
+    if (next !== AlertType.Alarm || !premium || !nativeAlarms || alarmPermission) {
       return;
     }
     if (Platform.OS === 'android') {
@@ -226,9 +229,9 @@ export function EditorScreen({ target, onClose, expanded, onToggleExpand }: { ta
 
   return (
     <KeyboardAvoidingView behavior="padding" style={[styles.flex, { backgroundColor: t.bg }]}>
-      <View style={[styles.header, { borderBottomColor: t.border, paddingTop: isMac ? 10 : insets.top + 6, paddingLeft: insets.left + 12, paddingRight: insets.right + 8 }]}>
+      <View style={[styles.header, { borderBottomColor: t.border, paddingTop: isDesktop ? 10 : insets.top + 6, paddingLeft: insets.left + 12, paddingRight: insets.right + 8 }]}>
         <Pressable testID="editor-done" accessibilityRole="button" onPress={done} hitSlop={10} style={styles.headerButton}>
-          <Text style={[styles.doneText, { color: t.accent }]}>{isMac ? 'Close' : 'Done'}</Text>
+          <Text style={[styles.doneText, { color: t.accent }]}>{isDesktop ? 'Close' : 'Done'}</Text>
         </Pressable>
         <View style={styles.flex} />
         {onToggleExpand ? <HeaderIcon label={expanded ? '⤡' : '⤢'} a11y={expanded ? 'Exit full width' : 'Full width'} onPress={onToggleExpand} color={t.textSecondary} /> : null}
@@ -279,6 +282,7 @@ export function EditorScreen({ target, onClose, expanded, onToggleExpand }: { ta
                 key={r.id}
                 reminder={r}
                 focused={r.id === focusReminderId}
+                locked={!premium}
                 onComplete={() => completeReminder(r.id)}
                 onChangeTime={() => setPicker({ mode: PickerMode.Edit, reminder: r })}
                 onToggleAlert={() => toggleAlert(r)}
@@ -308,6 +312,8 @@ export function EditorScreen({ target, onClose, expanded, onToggleExpand }: { ta
 
       <DateTimeSheet visible={picker !== null} value={picker?.mode === PickerMode.Edit ? new Date(picker.reminder.due_at) : null} onCancel={() => setPicker(null)} onConfirm={confirmPicker} />
       <ActionMenu visible={menu === EditorMenu.Folder} title="Move to folder" actions={folderActions} onClose={() => setMenu(null)} />
+      {!isDesktop ? <Paywall /> : null}
+      {!isDesktop ? <AlarmScreen /> : null}
       <ActionMenu visible={repeatMenu !== null} title="Repeat" actions={repeatActions} onClose={() => setRepeatMenu(null)} />
     </KeyboardAvoidingView>
   );
@@ -316,6 +322,7 @@ export function EditorScreen({ target, onClose, expanded, onToggleExpand }: { ta
 function EditorReminderRow({
   reminder,
   focused,
+  locked,
   onComplete,
   onChangeTime,
   onToggleAlert,
@@ -324,6 +331,7 @@ function EditorReminderRow({
 }: {
   reminder: Reminder;
   focused: boolean;
+  locked: boolean;
   onComplete: () => void;
   onChangeTime: () => void;
   onToggleAlert: () => void;
@@ -350,8 +358,8 @@ function EditorReminderRow({
           {formatDue(reminder.due_at, now)}
         </Text>
       </Pressable>
-      <Pill testID="alert-toggle" label={reminder.alert_type === AlertType.Alarm ? '⏰ Alarm' : '🔔'} onPress={onToggleAlert} active={reminder.alert_type === AlertType.Alarm} />
-      <Pill testID="repeat-pill" label={repeating ? `↻ ${REPEAT_LABELS[reminder.repeat_rule]}` : '↻'} onPress={onRepeat} active={repeating} />
+      <Pill testID="alert-toggle" label={reminder.alert_type === AlertType.Alarm ? '⏰ Alarm' : locked ? '🔔 🔒' : '🔔'} onPress={onToggleAlert} active={reminder.alert_type === AlertType.Alarm} />
+      <Pill testID="repeat-pill" label={repeating ? `↻ ${REPEAT_LABELS[reminder.repeat_rule]}` : locked ? '↻ 🔒' : '↻'} onPress={onRepeat} active={repeating} />
       <Pressable testID="reminder-delete" accessibilityRole="button" accessibilityLabel="Delete reminder" onPress={onDelete} hitSlop={4} style={styles.deleteButton}>
         <Text style={[styles.deleteText, { color: t.muted }]}>✕</Text>
       </Pressable>

@@ -3,7 +3,7 @@ import { Animated, Pressable, StyleSheet, Text, TextInput, View, type TextInputP
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useStore } from '../store/useStore';
 import { Overlay } from './Overlay';
-import { isMac, useTheme } from './theme';
+import { isDesktop, useTheme } from './theme';
 
 export enum ButtonKind {
   Primary = 'primary',
@@ -104,7 +104,7 @@ export function ActionMenu({ visible, title, actions, onClose }: { visible: bool
   const insets = useSafeAreaInsets();
   return (
     <Overlay visible={visible} onRequestClose={onClose}>
-      <View style={[styles.menuBackdrop, { backgroundColor: t.scrim, justifyContent: isMac ? 'center' : 'flex-end', paddingBottom: isMac ? 0 : insets.bottom + 10 }]}>
+      <View style={[styles.menuBackdrop, { backgroundColor: t.scrim, justifyContent: isDesktop ? 'center' : 'flex-end', paddingBottom: isDesktop ? 0 : insets.bottom + 10 }]}>
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel="Close menu" />
         <View style={[styles.menu, { backgroundColor: t.card }]}>
           {title ? (
@@ -205,7 +205,7 @@ export function ToastHost({ bottomInset }: { bottomInset: number }) {
   return (
     <Animated.View
       pointerEvents="box-none"
-      style={[styles.toastWrap, { bottom: isMac ? 20 : bottomInset + 84, opacity: anim, transform: [{ translateY }] }]}>
+      style={[styles.toastWrap, { bottom: isDesktop ? 20 : bottomInset + 84, opacity: anim, transform: [{ translateY }] }]}>
       <View style={[styles.toast, { backgroundColor: t.toast }]} accessibilityLiveRegion="polite">
         <Text numberOfLines={2} style={[styles.toastText, { color: t.toastText }]}>
           {toast.message}

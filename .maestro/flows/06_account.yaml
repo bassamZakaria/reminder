@@ -38,6 +38,7 @@ name: 06_account
 - tapOn:
     id: "tab-settings"
 - scrollUntilVisible:
+    centerElement: true
     element:
       id: "delete-account"
 - tapOn:

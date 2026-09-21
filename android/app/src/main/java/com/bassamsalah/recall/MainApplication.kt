@@ -2,6 +2,7 @@ package com.bassamsalah.recall
 
 import android.app.Application
 import com.bassamsalah.recall.alarms.AlarmNotificationsPackage
+import com.bassamsalah.recall.billing.RecallStorePackage
 import com.facebook.react.PackageList
 import com.facebook.react.ReactApplication
 import com.facebook.react.ReactHost
@@ -18,6 +19,7 @@ class MainApplication : Application(), ReactApplication {
         override fun getPackages(): List<ReactPackage> =
             PackageList(this).packages.apply {
               add(AlarmNotificationsPackage())
+              add(RecallStorePackage())
             }
 
         override fun getJSMainModuleName(): String = "index"

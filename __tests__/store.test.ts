@@ -10,7 +10,7 @@ function mockQuery(table: string) {
   const chain: Record<string, unknown> = {};
   const record = () => mockCalls.push({ table, op, payload });
   let rowId: string | undefined;
-  for (const method of ['select', 'order', 'single']) {
+  for (const method of ['select', 'order', 'single', 'maybeSingle']) {
     chain[method] = () => chain;
   }
   chain.eq = (_col: string, value: string) => {
@@ -19,6 +19,11 @@ function mockQuery(table: string) {
   };
   chain.insert = (p: unknown) => {
     op = 'insert';
+    payload = p;
+    return chain;
+  };
+  chain.upsert = (p: unknown) => {
+    op = 'upsert';
     payload = p;
     return chain;
   };
@@ -48,6 +53,7 @@ function mockQuery(table: string) {
 
 jest.mock('../src/lib/supabase', () => ({
   isConfigured: true,
+  links: { privacyPolicyUrl: null, supportUrl: null, termsUrl: '', forcePremium: false },
   supabase: {
     from: (table: string) => mockQuery(table),
     auth: { signOut: jest.fn(), onAuthStateChange: jest.fn(), getSession: jest.fn() },
@@ -69,7 +75,11 @@ jest.mock('../src/lib/alarms', () => ({
 }));
 
 import { alarms } from '../src/lib/alarms';
-import { friendlyError, useStore } from '../src/store/useStore';
+import { FREE_REMINDER_LIMIT, PremiumFeature } from '../src/lib/premium';
+import { NO_ENTITLEMENT } from '../src/lib/purchases';
+import { friendlyError, remoteIsActive, StorePlatform, useStore } from '../src/store/useStore';
+
+const PREMIUM = { ...NO_ENTITLEMENT, active: true };
 
 const NOTE: Note = {
   id: 'n1',
@@ -102,7 +112,7 @@ beforeEach(() => {
   mockCalls.length = 0;
   mockNextResult = { data: null, error: null };
   (alarms.requestPermission as jest.Mock).mockClear();
-  useStore.setState({ session: { user: { id: 'u' } } as never, notes: { n1: NOTE }, reminders: {}, lists: {}, toast: null, error: null, editor: null, permissionGranted: null });
+  useStore.setState({ session: { user: { id: 'u' } } as never, notes: { n1: NOTE }, reminders: {}, lists: {}, toast: null, error: null, editor: null, permissionGranted: null, paywall: null, entitlement: PREMIUM });
 });
 
 describe('completeReminder', () => {
@@ -206,6 +216,73 @@ describe('togglePin', () => {
   it('flips the pinned flag', async () => {
     await useStore.getState().togglePin('n1');
     expect(useStore.getState().notes.n1.is_pinned).toBe(true);
+  });
+});
+
+describe('free plan', () => {
+  beforeEach(() => useStore.setState({ entitlement: NO_ENTITLEMENT }));
+
+  it(`allows ${FREE_REMINDER_LIMIT} open reminders, then shows the paywall`, async () => {
+    const open: Record<string, ReturnType<typeof reminder>> = {};
+    for (let i = 0; i < FREE_REMINDER_LIMIT; i++) {
+      open[`r${i}`] = reminder({ id: `r${i}` });
+    }
+    useStore.setState({ reminders: open });
+    const created = await useStore.getState().createReminder('n1', { due_at: '2026-02-01T09:00:00Z' });
+    expect(created).toBeNull();
+    expect(useStore.getState().paywall).toBe(PremiumFeature.UnlimitedReminders);
+  });
+
+  it('completed reminders do not count toward the limit', async () => {
+    const done: Record<string, ReturnType<typeof reminder>> = {};
+    for (let i = 0; i < FREE_REMINDER_LIMIT; i++) {
+      done[`r${i}`] = reminder({ id: `r${i}`, is_completed: true });
+    }
+    useStore.setState({ reminders: done });
+    expect(await useStore.getState().createReminder('n1', { due_at: '2026-02-01T09:00:00Z' })).not.toBeNull();
+  });
+
+  it('alarms, repeats and folders open the paywall instead of saving', async () => {
+    useStore.setState({ reminders: { r1: reminder() } });
+    await useStore.getState().updateReminder('r1', { alert_type: AlertType.Alarm });
+    expect(useStore.getState().reminders.r1.alert_type).toBe(AlertType.Notification);
+    expect(useStore.getState().paywall).toBe(PremiumFeature.Alarms);
+
+    await useStore.getState().updateReminder('r1', { repeat_rule: RepeatRule.Weekly });
+    expect(useStore.getState().reminders.r1.repeat_rule).toBe(RepeatRule.None);
+    expect(useStore.getState().paywall).toBe(PremiumFeature.Repeat);
+
+    await useStore.getState().createList('Work', '#000');
+    expect(useStore.getState().lists).toEqual({});
+    expect(useStore.getState().paywall).toBe(PremiumFeature.Folders);
+  });
+
+  it('keeps editing the time of an existing reminder free', async () => {
+    useStore.setState({ reminders: { r1: reminder() } });
+    await useStore.getState().updateReminder('r1', { due_at: '2026-03-01T09:00:00Z' });
+    expect(useStore.getState().reminders.r1.due_at).toBe('2026-03-01T09:00:00Z');
+    expect(useStore.getState().paywall).toBeNull();
+  });
+});
+
+describe('premium from another platform', () => {
+  const now = Date.parse('2026-06-01T00:00:00Z');
+  const base = { user_id: 'u', product_id: 'recall_premium_yearly', platform: StorePlatform.Ios, updated_at: '2026-05-30T00:00:00Z' };
+
+  it('honours an active subscription until it expires', () => {
+    expect(remoteIsActive({ ...base, active: true, expires_at: '2026-07-01T00:00:00Z' }, now)).toBe(true);
+    expect(remoteIsActive({ ...base, active: true, expires_at: '2026-05-01T00:00:00Z' }, now)).toBe(false);
+  });
+
+  it('treats a report without expiry as stale after 35 days', () => {
+    const android = { ...base, platform: StorePlatform.Android, active: true, expires_at: null };
+    expect(remoteIsActive(android, now)).toBe(true);
+    expect(remoteIsActive({ ...android, updated_at: '2026-04-01T00:00:00Z' }, now)).toBe(false);
+  });
+
+  it('unlocks Premium on a device without its own subscription', () => {
+    useStore.setState({ entitlement: NO_ENTITLEMENT, remoteEntitlement: { ...base, active: true, expires_at: '2999-01-01T00:00:00Z' } });
+    expect(useStore.getState().isPremium()).toBe(true);
   });
 });
 

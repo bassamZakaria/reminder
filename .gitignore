@@ -82,3 +82,6 @@ supabase/.temp/
 # Maestro
 .maestro/output/
 .maestro/screenshots/
+
+# Web build
+dist-web/

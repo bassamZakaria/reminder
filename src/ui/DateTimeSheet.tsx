@@ -3,7 +3,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View, type NativeScrollEvent, 
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { isSameDay } from '../lib/schedule';
 import { Overlay, OverlayAnimation } from './Overlay';
-import { isMac, useTheme } from './theme';
+import { isDesktop, useTheme } from './theme';
 
 enum Meridiem {
   AM = 'AM',
@@ -66,11 +66,11 @@ export function DateTimeSheet({ visible, value, onCancel, onConfirm }: { visible
   const pm = draft.getHours() >= 12;
 
   return (
-    <Overlay visible={visible} animationType={isMac ? OverlayAnimation.Fade : OverlayAnimation.Slide} onRequestClose={onCancel}>
+    <Overlay visible={visible} animationType={isDesktop ? OverlayAnimation.Fade : OverlayAnimation.Slide} onRequestClose={onCancel}>
       <View style={styles.backdrop}>
         <Pressable style={StyleSheet.absoluteFill} onPress={onCancel} />
-        <View style={[styles.sheet, { backgroundColor: t.bg, paddingBottom: insets.bottom + 16, maxWidth: isMac ? 380 : undefined, paddingTop: isMac ? 16 : 6, alignSelf: isMac ? 'center' : 'stretch', borderRadius: isMac ? 16 : 0, borderTopLeftRadius: 16, borderTopRightRadius: 16 }]}>
-          {!isMac ? (
+        <View style={[styles.sheet, { backgroundColor: t.bg, paddingBottom: insets.bottom + 16, maxWidth: isDesktop ? 380 : undefined, paddingTop: isDesktop ? 16 : 6, alignSelf: isDesktop ? 'center' : 'stretch', borderRadius: isDesktop ? 16 : 0, borderTopLeftRadius: 16, borderTopRightRadius: 16 }]}>
+          {!isDesktop ? (
             <View style={styles.grabber}>
               <View style={[styles.grabberBar, { backgroundColor: t.border }]} />
             </View>
@@ -236,7 +236,7 @@ function shiftMonth(d: Date, n: number): Date {
 }
 
 const styles = StyleSheet.create({
-  backdrop: { flex: 1, justifyContent: isMac ? 'center' : 'flex-end', backgroundColor: 'rgba(0,0,0,0.35)' },
+  backdrop: { flex: 1, justifyContent: isDesktop ? 'center' : 'flex-end', backgroundColor: 'rgba(0,0,0,0.35)' },
   sheet: { paddingHorizontal: 16, paddingTop: 6 },
   grabber: { alignItems: 'center', paddingVertical: 8 },
   grabberBar: { width: 38, height: 4, borderRadius: 2 },

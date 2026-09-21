@@ -10,7 +10,7 @@ Pod::Spec.new do |s|
   s.source_files = "*.{h,m,swift}"
   s.swift_version = "5.9"
   s.static_framework = true
-  s.frameworks   = "UserNotifications"
+  s.frameworks   = "UserNotifications", "StoreKit"
   s.ios.weak_frameworks = "AlarmKit"
   s.osx.frameworks = "AppKit"
   s.dependency "React-Core"

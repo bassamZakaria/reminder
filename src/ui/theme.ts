@@ -1,6 +1,10 @@
-import { Platform, useColorScheme } from 'react-native';
+import { Dimensions, Platform, useColorScheme } from 'react-native';
+
+const DESKTOP_MIN_WIDTH = 900;
 
 export const isMac = Platform.OS === 'macos';
+export const isWeb = Platform.OS === 'web';
+export const isDesktop = isMac || (isWeb && Dimensions.get('window').width >= DESKTOP_MIN_WIDTH);
 
 // Text colours meet WCAG AA (4.5:1) on bg, pane and their soft tints; `check` meets 3:1 for controls.
 export interface Theme {

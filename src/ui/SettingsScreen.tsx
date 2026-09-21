@@ -5,11 +5,20 @@ import { alarms } from '../lib/alarms';
 import { links } from '../lib/supabase';
 import { useStore } from '../store/useStore';
 import { AppearanceMode } from '../lib/appearance';
+import { FREE_REMINDER_LIMIT, PremiumFeature } from '../lib/premium';
+import { purchases } from '../lib/purchases';
 import { AlertType } from '../types';
 import { ErrorBanner } from './common';
-import { isMac, useTheme } from './theme';
+import { isDesktop, useTheme } from './theme';
 
 const TEST_DELAY_S = 5;
+
+const NOTIFICATION_SETTINGS_PATH = Platform.select({
+  macos: 'System Settings › Notifications › Recall',
+  android: 'Settings › Apps › Recall › Notifications',
+  web: 'your browser’s site settings for this page',
+  default: 'Settings › Recall › Notifications',
+});
 
 const APPEARANCE_OPTIONS = [
   { mode: AppearanceMode.System, label: 'Automatic' },
@@ -31,6 +40,10 @@ export function SettingsScreen({ bottomInset }: { bottomInset: number }) {
   const requestAlarmPermission = useStore(s => s.requestAlarmPermission);
   const showToast = useStore(s => s.showToast);
   const appearance = useStore(s => s.appearance);
+  const entitlement = useStore(s => s.entitlement);
+  const premium = useStore(s => s.isPremium());
+  const openPaywall = useStore(s => s.openPaywall);
+  const restorePurchases = useStore(s => s.restorePurchases);
   const setAppearance = useStore(s => s.setAppearance);
   const notes = useStore(s => s.notes);
   const reminders = useStore(s => s.reminders);
@@ -61,7 +74,7 @@ export function SettingsScreen({ bottomInset }: { bottomInset: number }) {
       return;
     }
     await alarms.scheduleTest(new Date(Date.now() + TEST_DELAY_S * 1000), alertType);
-    showToast(isMac ? `Test ${alertType} in ${TEST_DELAY_S} seconds.` : `Test ${alertType} in ${TEST_DELAY_S} seconds. Lock your phone to see it.`);
+    showToast(Platform.OS === 'ios' || Platform.OS === 'android' ? `Test ${alertType} in ${TEST_DELAY_S} seconds. Lock your phone to see it.` : `Test ${alertType} in ${TEST_DELAY_S} seconds.`);
   };
 
   const confirmSignOut = () =>
@@ -84,19 +97,34 @@ export function SettingsScreen({ bottomInset }: { bottomInset: number }) {
 
   return (
     <View style={[styles.flex, { backgroundColor: t.bg }]}>
-      <View style={[styles.header, { paddingTop: isMac ? 14 : insets.top + 6, paddingLeft: insets.left + 16, paddingRight: insets.right + 16 }]}>
+      <View style={[styles.header, { paddingTop: isDesktop ? 14 : insets.top + 6, paddingLeft: insets.left + 16, paddingRight: insets.right + 16 }]}>
         <Text style={[styles.title, { color: t.text }]} accessibilityRole="header">
           Settings
         </Text>
       </View>
       <ErrorBanner />
-      <ScrollView contentContainerStyle={[styles.content, { paddingBottom: (isMac ? insets.bottom : bottomInset) + 24, paddingLeft: insets.left + 16, paddingRight: insets.right + 16 }]}>
+      <ScrollView contentContainerStyle={[styles.content, { paddingBottom: (isDesktop ? insets.bottom : bottomInset) + 24, paddingLeft: insets.left + 16, paddingRight: insets.right + 16 }]}>
         <SectionLabel text="Your data" />
         <Card>
           <Row label="Signed in as" value={session?.user.email ?? '—'} />
           <Row label="Notes" value={String(noteCount)} />
           <Row label="Open reminders" value={String(reminderCount)} />
           <Row label="Folders" value={String(Object.keys(lists).length)} last />
+        </Card>
+
+        <SectionLabel text="Recall Premium" />
+        <Card>
+          <Row
+            label="Plan"
+            value={premium ? (entitlement.inTrial ? 'Premium (free trial)' : 'Premium') : `Free · ${reminderCount} of ${FREE_REMINDER_LIMIT} reminders`}
+            tone={premium ? undefined : reminderCount >= FREE_REMINDER_LIMIT ? t.danger : undefined}
+          />
+          {entitlement.expiresAt ? (
+            <Row label={entitlement.willRenew ? 'Renews' : 'Ends'} value={new Date(entitlement.expiresAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })} />
+          ) : null}
+          {premium && purchases.available ? <ActionRow testID="manage-subscription" label="Manage Subscription" onPress={() => purchases.manage()} /> : null}
+          {!premium ? <ActionRow testID="upgrade" label="Try Premium Free" onPress={() => openPaywall(PremiumFeature.UnlimitedReminders)} last={!purchases.available} /> : null}
+          {purchases.available ? <ActionRow testID="restore-purchases" label="Restore Purchases" onPress={() => restorePurchases()} last /> : null}
         </Card>
 
         <SectionLabel text="Appearance" />
@@ -126,12 +154,12 @@ export function SettingsScreen({ bottomInset }: { bottomInset: number }) {
         </Card>
         {permission === false ? (
           <Text style={[styles.help, { color: t.danger }]}>
-            Notifications are off, so reminders can’t alert you. Turn them on in {isMac ? 'System Settings › Notifications › Recall' : Platform.OS === 'android' ? 'Settings › Apps › Recall › Notifications' : 'Settings › Recall › Notifications'}.
+            Notifications are off, so reminders can’t alert you. Turn them on in {NOTIFICATION_SETTINGS_PATH}.
           </Text>
         ) : null}
         <Card>
           {permission == null ? <ActionRow testID="enable-notifications" label="Turn on notifications" onPress={() => requestNotifications()} /> : null}
-          {permission === false && !isMac ? <ActionRow label="Open Settings" onPress={() => Linking.openSettings()} /> : null}
+          {permission === false && (Platform.OS === 'ios' || Platform.OS === 'android') ? <ActionRow label="Open Settings" onPress={() => Linking.openSettings()} /> : null}
           {Platform.OS === 'android' && nativeAlarms && !alarmPermission ? (
             <Text style={[styles.inlineHelp, { color: t.muted }]}>Without “Alarms & reminders”, Android may deliver reminders a few minutes late.</Text>
           ) : null}
@@ -147,7 +175,7 @@ export function SettingsScreen({ bottomInset }: { bottomInset: number }) {
           <ActionRow testID="refresh" label={refreshing ? 'Refreshing…' : 'Refresh from cloud'} onPress={refresh} last />
         </Card>
         <Text style={[styles.help, { color: t.muted }]}>
-          Changes sync instantly between your iPhone and Mac.{isMac ? '' : ' Pull down on a list to refresh.'}
+          Changes sync instantly between your devices.{isDesktop ? '' : ' Pull down on a list to refresh.'}
         </Text>
 
         {links.privacyPolicyUrl || links.supportUrl ? (

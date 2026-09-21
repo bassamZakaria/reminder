@@ -7,10 +7,11 @@ import { AlarmScreen } from './AlarmScreen';
 import { ToastHost } from './common';
 import { EditorScreen } from './EditorScreen';
 import { NoteList } from './NoteList';
+import { Paywall } from './Paywall';
 import { ReminderList } from './ReminderList';
 import { SettingsScreen } from './SettingsScreen';
 import { Sidebar } from './Sidebar';
-import { isMac, useTheme } from './theme';
+import { isDesktop, useTheme } from './theme';
 
 const TAB_BAR_HEIGHT = 52;
 
@@ -52,7 +53,7 @@ export function Shell() {
       ? openEditor({ kind: EditorKind.New, listId: null, nonce: Date.now(), withReminder: true })
       : openEditor({ kind: EditorKind.New, listId: folderId, nonce: Date.now() });
 
-  const bottomInset = isMac ? 0 : TAB_BAR_HEIGHT + insets.bottom;
+  const bottomInset = isDesktop ? 0 : TAB_BAR_HEIGHT + insets.bottom;
   const content =
     view.kind === ViewKind.Settings ? (
       <SettingsScreen bottomInset={bottomInset} />
@@ -62,7 +63,7 @@ export function Shell() {
       <NoteList bottomInset={bottomInset} />
     );
 
-  if (isMac) {
+  if (isDesktop) {
     return (
       <View style={[styles.row, { backgroundColor: t.bg }]}>
         {!expanded ? <Sidebar /> : null}
@@ -90,6 +91,7 @@ export function Shell() {
           )}
         </View>
         <ToastHost bottomInset={0} />
+        <Paywall />
         <AlarmScreen />
       </View>
     );
@@ -113,7 +115,8 @@ export function Shell() {
       <Modal visible={!!editor} animationType="slide" presentationStyle="fullScreen" onRequestClose={closeEditor}>
         {editor ? <EditorScreen key={editorKey(editor)} target={editor} /> : null}
       </Modal>
-      <AlarmScreen />
+      {!editor ? <Paywall /> : null}
+      {!editor ? <AlarmScreen /> : null}
     </View>
   );
 }

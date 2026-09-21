@@ -2,7 +2,7 @@
 
 _Last updated: 21 September 2026_
 
-Recall is a notes and reminders app for iPhone, Mac and Android. This policy explains what data Recall handles and why.
+Recall is a notes and reminders app for iPhone, Mac, Android and the web. This policy explains what data Recall handles and why.
 
 ## What we collect
 
@@ -10,6 +10,7 @@ Recall is a notes and reminders app for iPhone, Mac and Android. This policy exp
 | --- | --- | --- |
 | Email address | To create your account and sign you in | Yes |
 | Your notes, reminders and folders | To store them and sync them between your devices | Yes |
+| Subscription status (active, plan, renewal date) | To unlock Premium on all of your devices | Yes |
 
 That is all. Recall does not collect your location, contacts, device identifiers, advertising identifiers, analytics or crash data, and it does not track you across other companies' apps or websites.
 
@@ -18,6 +19,10 @@ That is all. Recall does not collect your location, contacts, device identifiers
 Your account and content are stored with our database provider, Supabase, in the European Union (Frankfurt). Data is encrypted in transit (HTTPS). Only you can read your notes and reminders: every row is protected by database rules that allow access to the signed-in owner only.
 
 Reminder notifications and alarms are scheduled on your own device from your synced reminders. Their content never passes through Apple or Google push servers.
+
+## Payments
+
+Subscriptions are sold and billed by Apple (App Store) or Google (Google Play). We never see or store your payment details. The app only records whether your Premium subscription is active.
 
 ## Sharing
 

@@ -2,12 +2,13 @@ import React, { useCallback, useMemo, useState } from 'react';
 import { Alert, Pressable, RefreshControl, ScrollView, SectionList, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { groupNotes, remindersByNote, SectionKey, type Section } from '../lib/grouping';
+import { PremiumFeature } from '../lib/premium';
 import { noteHeadline } from '../lib/schedule';
 import { EditorKind, useLists, useNotes, useReminders, useStore } from '../store/useStore';
 import { LIST_COLORS, ViewKind, type List, type Note } from '../types';
 import { ActionMenu, Empty, ErrorBanner, IconButton, Input, PromptSheet, type MenuAction } from './common';
 import { NoteRow } from './NoteRow';
-import { isMac, useTheme } from './theme';
+import { isDesktop, useTheme } from './theme';
 
 const NO_REMINDERS: never[] = [];
 
@@ -54,11 +55,11 @@ export function NoteList({ bottomInset }: { bottomInset: number }) {
 
   const empty = search
     ? { icon: '🔍', title: 'No results', hint: `Nothing matches “${search.trim()}”.` }
-    : { icon: '🗒️', title: folder ? `No notes in ${folder.name}` : 'No notes yet', hint: isMac ? 'Press ＋ to write a note.' : 'Tap ＋ to write a note.' };
+    : { icon: '🗒️', title: folder ? `No notes in ${folder.name}` : 'No notes yet', hint: isDesktop ? 'Press ＋ to write a note.' : 'Tap ＋ to write a note.' };
 
   return (
     <View style={[styles.wrap, { backgroundColor: t.bg }]}>
-      <View style={[styles.header, { paddingTop: isMac ? 14 : insets.top + 6, paddingLeft: insets.left + 16, paddingRight: insets.right + 12 }]}>
+      <View style={[styles.header, { paddingTop: isDesktop ? 14 : insets.top + 6, paddingLeft: insets.left + 16, paddingRight: insets.right + 12 }]}>
         <View style={styles.headerText}>
           <Text numberOfLines={1} style={[styles.title, { color: t.text }]} accessibilityRole="header">
             {folder?.name ?? 'Notes'}
@@ -67,13 +68,13 @@ export function NoteList({ bottomInset }: { bottomInset: number }) {
             {count} {count === 1 ? 'note' : 'notes'}
           </Text>
         </View>
-        {isMac ? <IconButton testID="new-note" label="＋" size={22} accessibilityLabel="New note" onPress={newNote} /> : null}
+        {isDesktop ? <IconButton testID="new-note" label="＋" size={22} accessibilityLabel="New note" onPress={newNote} /> : null}
       </View>
 
       <View style={[styles.controls, { paddingLeft: insets.left + 12, paddingRight: insets.right + 12 }]}>
         <Input testID="search" placeholder="Search notes" value={search} onChangeText={setSearch} clearButtonMode="while-editing" autoCorrect={false} style={styles.search} />
       </View>
-      {!isMac ? <FolderChips /> : null}
+      {!isDesktop ? <FolderChips /> : null}
 
       <ErrorBanner />
 
@@ -88,7 +89,7 @@ export function NoteList({ bottomInset }: { bottomInset: number }) {
         contentContainerStyle={sections.length === 0 ? styles.emptyContainer : { paddingBottom: bottomInset + 90 }}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
-        refreshControl={isMac ? undefined : <RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={t.muted} />}
+        refreshControl={isDesktop ? undefined : <RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={t.muted} />}
         ListEmptyComponent={<Empty icon={empty.icon} title={empty.title} hint={empty.hint} />}
       />
 
@@ -99,6 +100,8 @@ export function NoteList({ bottomInset }: { bottomInset: number }) {
 
 function FolderChips() {
   const folders = useLists();
+  const premium = useStore(s => s.isPremium());
+  const openPaywall = useStore(s => s.openPaywall);
   const view = useStore(s => s.view);
   const setView = useStore(s => s.setView);
   const createList = useStore(s => s.createList);
@@ -130,7 +133,7 @@ function FolderChips() {
             onLongPress={() => setMenuFolder(f)}
           />
         ))}
-        <Chip testID="add-folder" label="＋ Folder" onPress={() => setCreating(true)} dashed />
+        <Chip testID="add-folder" label={premium ? '＋ Folder' : '＋ Folder 🔒'} onPress={() => (premium ? setCreating(true) : openPaywall(PremiumFeature.Folders))} dashed />
       </ScrollView>
       <PromptSheet
         visible={creating}

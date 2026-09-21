@@ -1,10 +1,11 @@
 import React, { useMemo, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { PremiumFeature } from '../lib/premium';
 import { useLists, useNotes, useReminders, useStore } from '../store/useStore';
 import { LIST_COLORS, ViewKind, type List, type View as AppView } from '../types';
 import { ActionMenu, Input, PromptSheet } from './common';
-import { isMac, useTheme } from './theme';
+import { isDesktop, useTheme } from './theme';
 
 function sameView(a: AppView, b: AppView): boolean {
   return a.kind === b.kind && ('id' in a && 'id' in b ? a.id === b.id : true);
@@ -67,6 +68,8 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   const createList = useStore(s => s.createList);
   const updateList = useStore(s => s.updateList);
   const deleteList = useStore(s => s.deleteList);
+  const premium = useStore(s => s.isPremium());
+  const openPaywall = useStore(s => s.openPaywall);
   const [adding, setAdding] = useState(false);
   const [name, setName] = useState('');
   const [color, setColor] = useState(LIST_COLORS[0]);
@@ -112,15 +115,15 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
 
   return (
     <View style={[styles.sidebar, { backgroundColor: t.sidebar, borderRightColor: t.border }]}>
-      <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingTop: isMac ? 34 : insets.top + 12, paddingBottom: insets.bottom + 16 }}>
-        {!isMac ? <Text style={[styles.brand, { color: t.text }]}>Recall</Text> : null}
+      <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingTop: isDesktop ? 34 : insets.top + 12, paddingBottom: insets.bottom + 16 }}>
+        {!isDesktop ? <Text style={[styles.brand, { color: t.text }]}>Recall</Text> : null}
         <NavItem testID="nav-reminders" active={sameView(view, { kind: ViewKind.Reminders })} icon="⏰" label="Reminders" count={openReminders.length} alert={overdue} onPress={() => go({ kind: ViewKind.Reminders })} />
         <NavItem testID="nav-notes" active={sameView(view, { kind: ViewKind.Notes })} icon="🗒️" label="Notes" count={notes.length} onPress={() => go({ kind: ViewKind.Notes })} />
 
         <View style={styles.groupRow}>
           <Text style={[styles.groupLabel, { color: t.muted }]}>FOLDERS</Text>
-          <Pressable testID="add-folder" accessibilityRole="button" accessibilityLabel={adding ? 'Cancel new folder' : 'New folder'} onPress={() => setAdding(a => !a)} hitSlop={10}>
-            <Text style={[styles.groupAction, { color: t.accent }]}>{adding ? 'Cancel' : '＋ New'}</Text>
+          <Pressable testID="add-folder" accessibilityRole="button" accessibilityLabel={adding ? 'Cancel new folder' : 'New folder'} onPress={() => (premium || adding ? setAdding(a => !a) : openPaywall(PremiumFeature.Folders))} hitSlop={10}>
+            <Text style={[styles.groupAction, { color: t.accent }]}>{adding ? 'Cancel' : premium ? '＋ New' : '＋ New 🔒'}</Text>
           </Pressable>
         </View>
         {adding ? (
@@ -156,7 +159,7 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
           />
         ))}
         {folders.length === 0 && !adding ? <Text style={[styles.hint, { color: t.muted }]}>Group notes into folders like Work or Home.</Text> : null}
-        {folders.length > 0 ? <Text style={[styles.hint, { color: t.muted }]}>{isMac ? 'Long-click' : 'Long-press'} a folder to rename or delete it.</Text> : null}
+        {folders.length > 0 ? <Text style={[styles.hint, { color: t.muted }]}>{isDesktop ? 'Long-click' : 'Long-press'} a folder to rename or delete it.</Text> : null}
 
         <View style={styles.spacer} />
         <NavItem testID="nav-settings" active={sameView(view, { kind: ViewKind.Settings })} icon="⚙️" label="Settings" onPress={() => go({ kind: ViewKind.Settings })} />
@@ -193,13 +196,13 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
 }
 
 const styles = StyleSheet.create({
-  sidebar: { flex: 1, width: isMac ? 220 : undefined, borderRightWidth: StyleSheet.hairlineWidth },
+  sidebar: isDesktop ? { width: 230, flexGrow: 0, flexShrink: 0, borderRightWidth: StyleSheet.hairlineWidth } : { flex: 1, borderRightWidth: StyleSheet.hairlineWidth },
   brand: { fontSize: 28, fontWeight: '800', paddingHorizontal: 18, paddingBottom: 14, letterSpacing: -0.5 },
   groupRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 18, paddingTop: 22, paddingBottom: 6 },
   groupLabel: { fontSize: 11, fontWeight: '700', letterSpacing: 0.6 },
   groupAction: { fontSize: 13, fontWeight: '600' },
-  nav: { flexDirection: 'row', alignItems: 'center', marginHorizontal: 8, paddingVertical: isMac ? 7 : 11, paddingHorizontal: 10, borderRadius: 9 },
-  navLabel: { flex: 1, fontSize: isMac ? 14 : 16 },
+  nav: { flexDirection: 'row', alignItems: 'center', marginHorizontal: 8, paddingVertical: isDesktop ? 7 : 11, paddingHorizontal: 10, borderRadius: 9 },
+  navLabel: { flex: 1, fontSize: isDesktop ? 14 : 16 },
   count: { fontSize: 13 },
   alert: { minWidth: 18, height: 18, borderRadius: 9, paddingHorizontal: 5, alignItems: 'center', justifyContent: 'center', marginRight: 6 },
   alertText: { color: '#fff', fontSize: 11, fontWeight: '800' },

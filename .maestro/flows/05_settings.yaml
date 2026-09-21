@@ -10,6 +10,9 @@ name: 05_settings
     id: "tab-settings"
 - assertVisible: "Settings"
 - assertVisible: ${EMAIL}
+- scrollUntilVisible:
+    element:
+      text: "Allowed"
 - assertVisible: "Allowed"
 - takeScreenshot: screenshots/05-settings
 
@@ -42,10 +45,15 @@ name: 05_settings
 - tapOn:
     id: "appearance-system"
 
+- scrollUntilVisible:
+    centerElement: true
+    element:
+      id: "test-notification"
 - tapOn:
     id: "test-notification"
 - assertVisible: "Test notification in 5 seconds.*"
 - scrollUntilVisible:
+    centerElement: true
     element:
       id: "sign-out"
 - tapOn:

@@ -4,7 +4,7 @@ import { formatDue, formatReminderTime } from '../lib/dates';
 import { firstLine, noteHeadline } from '../lib/schedule';
 import { EditorKind, useStore } from '../store/useStore';
 import { AlertType, REPEAT_LABELS, RepeatRule, type Reminder } from '../types';
-import { isMac, useTheme } from './theme';
+import { isDesktop, useTheme } from './theme';
 
 export const ReminderRow = memo(function ReminderRow({
   reminder,
@@ -44,7 +44,7 @@ export const ReminderRow = memo(function ReminderRow({
         accessibilityLabel={[title, snippet, formatDue(reminder.due_at, now), repeating ? `repeats ${REPEAT_LABELS[reminder.repeat_rule].toLowerCase()}` : '', reminder.alert_type === AlertType.Alarm ? 'alarm' : '', reminder.is_completed ? 'done' : '']
           .filter(Boolean)
           .join(', ')}
-        onPress={isMac ? openNote : () => onToggleExpand(reminder.id)}
+        onPress={isDesktop ? openNote : () => onToggleExpand(reminder.id)}
         onLongPress={() => onLongPress(reminder)}
         delayLongPress={350}
         style={({ pressed, hovered }: { pressed: boolean; hovered?: boolean }) => [

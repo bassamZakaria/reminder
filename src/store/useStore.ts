@@ -1,8 +1,12 @@
 import { useMemo } from 'react';
+import { Platform } from 'react-native';
 import { create } from 'zustand';
 import type { RealtimeChannel, Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import { AppearanceMode, applyAppearance, loadAppearance, saveAppearance } from '../lib/appearance';
+import { blockedFeature, canAddReminder, PremiumFeature } from '../lib/premium';
+import { NO_ENTITLEMENT, PurchaseStatus, purchases, StoreState, type Entitlement, type ProductId, type StoreProduct } from '../lib/purchases';
+import { links } from '../lib/supabase';
 import { alarms, NotificationAction, type AlarmFiredEvent, type NotificationActionEvent } from '../lib/alarms';
 import { nextAfterCompletion, noteHeadline, SNOOZE_SUFFIX } from '../lib/schedule';
 import { AlertType, RepeatRule, ViewKind, type List, type Note, type Reminder, type View } from '../types';
@@ -22,6 +26,7 @@ enum RealtimeEvent {
 }
 
 enum Table {
+  Entitlements = 'entitlements',
   Notes = 'notes',
   Reminders = 'reminders',
   Lists = 'lists',
@@ -51,9 +56,21 @@ interface State {
   nativeAlarms: boolean;
   activeAlarm: AlarmFiredEvent | null;
   appearance: AppearanceMode;
+  entitlement: Entitlement;
+  remoteEntitlement: RemoteEntitlement | null;
+  products: StoreProduct[];
+  storeState: StoreState;
+  paywall: PremiumFeature | null;
+  purchasing: ProductId | null;
 
   init(): Promise<void>;
   setAppearance(mode: AppearanceMode): void;
+  isPremium(): boolean;
+  openPaywall(feature: PremiumFeature): void;
+  closePaywall(): void;
+  loadStore(): Promise<void>;
+  buy(productId: ProductId): Promise<void>;
+  restorePurchases(): Promise<void>;
   info: string | null;
   signIn(email: string, password: string): Promise<void>;
   signUp(email: string, password: string): Promise<void>;
@@ -174,6 +191,61 @@ export function friendlyError(message: string): string {
   return message;
 }
 
+export enum StorePlatform {
+  Ios = 'ios',
+  Macos = 'macos',
+  Android = 'android',
+}
+
+export interface RemoteEntitlement {
+  user_id: string;
+  active: boolean;
+  product_id: string | null;
+  platform: StorePlatform;
+  expires_at: string | null;
+  updated_at: string;
+}
+
+const REMOTE_WITHOUT_EXPIRY_VALID_MS = 35 * 24 * 3600_000;
+
+export function remoteIsActive(remote: RemoteEntitlement | null, now = Date.now()): boolean {
+  if (!remote?.active) {
+    return false;
+  }
+  if (remote.expires_at) {
+    return new Date(remote.expires_at).getTime() > now;
+  }
+  return now - new Date(remote.updated_at).getTime() < REMOTE_WITHOUT_EXPIRY_VALID_MS;
+}
+
+function currentStorePlatform(): StorePlatform | null {
+  return Object.values(StorePlatform).find(p => p === Platform.OS) ?? null;
+}
+
+async function reportEntitlement(get: () => State, set: (partial: Partial<State>) => void) {
+  const session = get().session;
+  const platform = currentStorePlatform();
+  if (!session || !platform || !purchases.available) {
+    return;
+  }
+  const { entitlement, remoteEntitlement } = get();
+  // Only the platform that granted Premium may revoke it, so a free device never wipes another store's subscription.
+  if (!entitlement.active && remoteEntitlement?.platform !== platform) {
+    return;
+  }
+  const row = {
+    user_id: session.user.id,
+    active: entitlement.active,
+    product_id: entitlement.productId,
+    platform,
+    expires_at: entitlement.expiresAt ? new Date(entitlement.expiresAt).toISOString() : null,
+  };
+  const { data } = await supabase.from(Table.Entitlements).upsert(row).select().maybeSingle();
+  if (data) {
+    set({ remoteEntitlement: data as RemoteEntitlement });
+  }
+}
+
 function requestNotificationPermission(set: (partial: Partial<State>) => void) {
   alarms
     .requestPermission()
@@ -200,6 +272,68 @@ export const useStore = create<State>((set, get) => ({
   nativeAlarms: false,
   activeAlarm: null,
   appearance: AppearanceMode.System,
+  entitlement: NO_ENTITLEMENT,
+  remoteEntitlement: null,
+  products: [],
+  storeState: StoreState.Idle,
+  paywall: null,
+  purchasing: null,
+
+  isPremium: () => links.forcePremium || get().entitlement.active || remoteIsActive(get().remoteEntitlement),
+
+  openPaywall(feature) {
+    set({ paywall: feature });
+    if (get().storeState !== StoreState.Ready && get().storeState !== StoreState.Loading) {
+      get().loadStore();
+    }
+  },
+
+  closePaywall: () => set({ paywall: null }),
+
+  async loadStore() {
+    set({ storeState: StoreState.Loading });
+    const [entitlement, products] = await Promise.all([purchases.entitlement().catch(() => get().entitlement), purchases.products().catch(() => [])]);
+    set({ entitlement, products, storeState: products.length ? StoreState.Ready : StoreState.Unavailable });
+    await reportEntitlement(get, set);
+  },
+
+  async buy(productId) {
+    if (get().purchasing) {
+      return;
+    }
+    set({ purchasing: productId });
+    try {
+      const status = await purchases.purchase(productId);
+      if (status === PurchaseStatus.Purchased) {
+        const entitlement = await purchases.entitlement();
+        set({ entitlement, paywall: entitlement.active ? null : get().paywall });
+        await reportEntitlement(get, set);
+        if (entitlement.active) {
+          get().showToast('Welcome to Recall Premium.');
+        }
+      } else if (status === PurchaseStatus.Pending) {
+        get().showToast('Your purchase is waiting for approval.');
+      }
+    } catch (e) {
+      set({ error: friendlyError(e instanceof Error ? e.message : String(e)) });
+    } finally {
+      set({ purchasing: null });
+    }
+  },
+
+  async restorePurchases() {
+    try {
+      const entitlement = await purchases.restore();
+      set({ entitlement });
+      get().showToast(entitlement.active ? 'Premium restored.' : 'No active subscription found for this account.');
+      if (entitlement.active) {
+        set({ paywall: null });
+      }
+      await reportEntitlement(get, set);
+    } catch (e) {
+      set({ error: friendlyError(e instanceof Error ? e.message : String(e)) });
+    }
+  },
 
   setAppearance(mode) {
     applyAppearance(mode);
@@ -208,6 +342,11 @@ export const useStore = create<State>((set, get) => ({
   },
 
   async init() {
+    purchases.onChange(entitlement => {
+      set({ entitlement });
+      reportEntitlement(get, set);
+    });
+    get().loadStore();
     loadAppearance().then(mode => {
       applyAppearance(mode);
       set({ appearance: mode });
@@ -288,11 +427,13 @@ export const useStore = create<State>((set, get) => ({
       return;
     }
     set({ loading: true, error: null });
-    const [listsRes, notesRes, remindersRes] = await Promise.all([
+    const [listsRes, notesRes, remindersRes, entitlementRes] = await Promise.all([
       supabase.from(Table.Lists).select('*').order('sort_order').order('created_at'),
       supabase.from(Table.Notes).select('*').order('updated_at', { ascending: false }),
       supabase.from(Table.Reminders).select('*').order('due_at'),
+      supabase.from(Table.Entitlements).select('*').maybeSingle(),
     ]);
+    set({ remoteEntitlement: (entitlementRes.data as RemoteEntitlement | null) ?? null });
     const error = listsRes.error ?? notesRes.error ?? remindersRes.error;
     if (error) {
       set({ loading: false, error: friendlyError(error.message) });
@@ -307,7 +448,7 @@ export const useStore = create<State>((set, get) => ({
     });
     setupRealtime(session.user.id, set, get);
     scheduleSync(get);
-    if (get().permissionGranted === null && Object.values(get().reminders).some(r => !r.is_completed)) {
+    if (Platform.OS !== 'web' && get().permissionGranted === null && Object.values(get().reminders).some(r => !r.is_completed)) {
       requestNotificationPermission(set);
     }
   },
@@ -429,6 +570,12 @@ export const useStore = create<State>((set, get) => ({
     if (!session) {
       return null;
     }
+    const premium = get().isPremium();
+    const blocked = canAddReminder(Object.values(get().reminders), premium) ? blockedFeature(input, premium) : PremiumFeature.UnlimitedReminders;
+    if (blocked) {
+      get().openPaywall(blocked);
+      return null;
+    }
     const row = { repeat_rule: RepeatRule.None, alert_type: AlertType.Notification, ...input, note_id: noteId, user_id: session.user.id };
     const { data, error } = await supabase.from(Table.Reminders).insert(row).select().single();
     if (error) {
@@ -447,6 +594,15 @@ export const useStore = create<State>((set, get) => ({
   async updateReminder(id, patch) {
     const prev = get().reminders[id];
     if (!prev) {
+      return;
+    }
+    const blocked = blockedFeature(patch, get().isPremium());
+    if (blocked) {
+      get().openPaywall(blocked);
+      return;
+    }
+    if (patch.is_completed === false && prev.is_completed && !canAddReminder(Object.values(get().reminders), get().isPremium())) {
+      get().openPaywall(PremiumFeature.UnlimitedReminders);
       return;
     }
     set(s => ({ reminders: { ...s.reminders, [id]: { ...prev, ...patch, updated_at: new Date().toISOString() } } }));
@@ -512,6 +668,10 @@ export const useStore = create<State>((set, get) => ({
   async createList(name, color) {
     const session = get().session;
     if (!session) {
+      return;
+    }
+    if (!get().isPremium()) {
+      get().openPaywall(PremiumFeature.Folders);
       return;
     }
     const sort_order = Object.keys(get().lists).length;

@@ -1,6 +1,6 @@
 # Recall
 
-Notes + Reminders in one app for iPhone, Mac and Android. One React Native codebase (`react-native-macos` for desktop), Supabase for sync, native notifications and alarms on every platform.
+Notes + Reminders in one app for iPhone, Mac, Android and the web (installable PWA). One React Native codebase (`react-native-macos` for desktop), Supabase for sync, native notifications and alarms on every platform.
 
 ## One-time setup
 
@@ -18,6 +18,7 @@ The JavaScript bundle and `app.config.json` are baked into Release builds, so th
 - **iPhone**: connect the phone, enable Developer Mode (Settings › Privacy & Security), open `ios/Recall.xcworkspace`, pick your team under Signing & Capabilities, select the phone and run with the **Release** scheme configuration (Product › Scheme › Edit Scheme › Run › Build Configuration). Or: `yarn ios --mode Release --device`.
   With a free Apple ID the install expires after 7 days; re-run to renew. A paid developer account lasts a year.
 - **Android**: `cd android && ./gradlew assembleRelease`, then `adb install app/build/outputs/apk/release/app-release.apk`. For Google Play, build `./gradlew bundleRelease` with your upload key (see `docs/store-submission.md`).
+- **Web / PWA**: `yarn web:build`, then upload `dist-web/` to any HTTPS static host with a fallback of every path to `index.html` (Netlify `_redirects`: `/* /index.html 200`; Vercel rewrite; GitHub Pages: copy `index.html` to `404.html`). Browsers show reminders only while Recall is open in a tab or installed as an app.
 - **Mac**: `xcodebuild -workspace macos/Recall.xcworkspace -scheme Recall-macOS -configuration Release -derivedDataPath build/mac build`, then copy `build/mac/Build/Products/Release/Recall.app` to `/Applications`.
 
 After the first launch, open Settings in the app and tap **Send a test notification** to confirm alerts work on that device.
@@ -32,6 +33,7 @@ Free Supabase projects pause after 7 days without database activity. `.github/wo
 
 - iPhone simulator: `yarn ios`
 - Android emulator: `yarn android`
+- Web: `yarn web`
 - Mac: `yarn macos`
 - Metro only: `yarn start`
 
@@ -43,7 +45,7 @@ See [`docs/store-submission.md`](docs/store-submission.md) for the App Store and
 
 - Unit: `yarn test` (scheduling, grouping, store behaviour)
 - Types and lint: `yarn typecheck && yarn lint`
-- UI (iOS simulator or Android emulator): install [Maestro](https://maestro.mobile.dev), `yarn supabase start`, point `app.config.json` at `http://127.0.0.1:54321` with the local anon key, install a Release build, then `DEVICE=<simulator UDID or emulator-5554> yarn test:ui`. On Android run `adb reverse tcp:54321 tcp:54321` first. The script resets the local database, creates a test user and runs `.maestro/flows`.
+- UI (iOS simulator or Android emulator): flows in `.maestro/flows` expect Premium, so add `"forcePremium": true` to your local `app.config.json` (never set it in a release config); `FLOWS=.maestro/free` checks the free plan and paywall on a build without it. Install [Maestro](https://maestro.mobile.dev), `yarn supabase start`, point `app.config.json` at `http://127.0.0.1:54321` with the local anon key, install a Release build, then `DEVICE=<simulator UDID or emulator-5554> yarn test:ui`. On Android run `adb reverse tcp:54321 tcp:54321` first. The script resets the local database, creates a test user and runs `.maestro/flows`.
 
 ## How it works
 
