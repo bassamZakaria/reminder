@@ -56,6 +56,13 @@ jest.mock('../src/lib/supabase', () => ({
   },
 }));
 
+jest.mock('../src/lib/appearance', () => ({
+  AppearanceMode: { System: 'system', Light: 'light', Dark: 'dark' },
+  applyAppearance: jest.fn(),
+  loadAppearance: jest.fn(() => Promise.resolve('system')),
+  saveAppearance: jest.fn(() => Promise.resolve()),
+}));
+
 jest.mock('../src/lib/alarms', () => ({
   alarms: { sync: jest.fn(() => Promise.resolve()), requestPermission: jest.fn(() => Promise.resolve(true)), cancel: jest.fn(), scheduleOnce: jest.fn(() => Promise.resolve()), cancelAll: jest.fn() },
   NotificationAction: {},
@@ -199,6 +206,16 @@ describe('togglePin', () => {
   it('flips the pinned flag', async () => {
     await useStore.getState().togglePin('n1');
     expect(useStore.getState().notes.n1.is_pinned).toBe(true);
+  });
+});
+
+describe('appearance', () => {
+  it('applies and remembers the chosen mode', () => {
+    const { applyAppearance, saveAppearance } = require('../src/lib/appearance');
+    useStore.getState().setAppearance('dark' as never);
+    expect(useStore.getState().appearance).toBe('dark');
+    expect(applyAppearance).toHaveBeenCalledWith('dark');
+    expect(saveAppearance).toHaveBeenCalledWith('dark');
   });
 });
 

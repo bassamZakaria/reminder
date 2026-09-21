@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { create } from 'zustand';
 import type { RealtimeChannel, Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
+import { AppearanceMode, applyAppearance, loadAppearance, saveAppearance } from '../lib/appearance';
 import { alarms, NotificationAction, type AlarmFiredEvent, type NotificationActionEvent } from '../lib/alarms';
 import { nextAfterCompletion, noteHeadline, SNOOZE_SUFFIX } from '../lib/schedule';
 import { AlertType, RepeatRule, ViewKind, type List, type Note, type Reminder, type View } from '../types';
@@ -49,8 +50,10 @@ interface State {
   alarmPermission: boolean | null;
   nativeAlarms: boolean;
   activeAlarm: AlarmFiredEvent | null;
+  appearance: AppearanceMode;
 
   init(): Promise<void>;
+  setAppearance(mode: AppearanceMode): void;
   info: string | null;
   signIn(email: string, password: string): Promise<void>;
   signUp(email: string, password: string): Promise<void>;
@@ -196,8 +199,19 @@ export const useStore = create<State>((set, get) => ({
   alarmPermission: null,
   nativeAlarms: false,
   activeAlarm: null,
+  appearance: AppearanceMode.System,
+
+  setAppearance(mode) {
+    applyAppearance(mode);
+    set({ appearance: mode });
+    saveAppearance(mode);
+  },
 
   async init() {
+    loadAppearance().then(mode => {
+      applyAppearance(mode);
+      set({ appearance: mode });
+    });
     const { data } = await supabase.auth.getSession();
     set({ session: data.session, authReady: true });
     supabase.auth.onAuthStateChange((_event, session) => {

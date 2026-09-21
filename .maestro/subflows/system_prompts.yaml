@@ -10,3 +10,8 @@ appId: com.bassamsalah.recall
       visible: "Save Password?"
     commands:
       - tapOn: "Not Now"
+- runFlow:
+    when:
+      visible: "Ring exactly on time?"
+    commands:
+      - tapOn: "(?i)not now"

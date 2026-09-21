@@ -44,9 +44,20 @@ name: 06_account
     id: "delete-account"
 - assertVisible: "Delete your account?"
 - takeScreenshot: screenshots/06-delete-confirm
-- tapOn:
-    text: "Delete Account"
-    above: "Cancel"
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - tapOn:
+          text: "Delete Account"
+          above: "Cancel"
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - tapOn:
+          text: "(?i)delete account"
+          rightOf: "(?i)cancel"
 - extendedWaitUntil:
     visible:
       id: "email"

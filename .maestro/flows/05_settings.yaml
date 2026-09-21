@@ -11,10 +11,40 @@ name: 05_settings
 - assertVisible: "Settings"
 - assertVisible: ${EMAIL}
 - assertVisible: "Allowed"
+- takeScreenshot: screenshots/05-settings
+
+# Appearance: force dark, check the main screens, then force light
+- tapOn:
+    id: "appearance-dark"
+- takeScreenshot: screenshots/05-settings-dark
+- tapOn:
+    id: "tab-reminders"
+- takeScreenshot: screenshots/05-reminders-dark
+- tapOn:
+    id: "tab-notes"
+- takeScreenshot: screenshots/05-notes-dark
+- tapOn:
+    id: "row-Dentist"
+- waitForAnimationToEnd
+- takeScreenshot: screenshots/05-editor-dark
+- tapOn:
+    id: "editor-done"
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible:
+      id: "tab-settings"
+    timeout: 10000
+- tapOn:
+    id: "tab-settings"
+- tapOn:
+    id: "appearance-light"
+- takeScreenshot: screenshots/05-settings-light
+- tapOn:
+    id: "appearance-system"
+
 - tapOn:
     id: "test-notification"
 - assertVisible: "Test notification in 5 seconds.*"
-- takeScreenshot: screenshots/05-settings
 - scrollUntilVisible:
     element:
       id: "sign-out"

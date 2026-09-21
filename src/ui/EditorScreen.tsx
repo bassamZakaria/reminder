@@ -225,7 +225,7 @@ export function EditorScreen({ target, onClose, expanded, onToggleExpand }: { ta
     : [];
 
   return (
-    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={[styles.flex, { backgroundColor: t.bg }]}>
+    <KeyboardAvoidingView behavior="padding" style={[styles.flex, { backgroundColor: t.bg }]}>
       <View style={[styles.header, { borderBottomColor: t.border, paddingTop: isMac ? 10 : insets.top + 6, paddingLeft: insets.left + 12, paddingRight: insets.right + 8 }]}>
         <Pressable testID="editor-done" accessibilityRole="button" onPress={done} hitSlop={10} style={styles.headerButton}>
           <Text style={[styles.doneText, { color: t.accent }]}>{isMac ? 'Close' : 'Done'}</Text>

@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { KeyboardAvoidingView, Linking, Platform, Pressable, ScrollView, StyleSheet, Text, View, type TextInput } from 'react-native';
+import { KeyboardAvoidingView, Linking, Pressable, ScrollView, StyleSheet, Text, View, type TextInput } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { isConfigured, links } from '../lib/supabase';
 import { useStore } from '../store/useStore';
@@ -36,7 +36,7 @@ export function AuthScreen() {
   };
 
   return (
-    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={[styles.flex, { backgroundColor: t.pane }]}>
+    <KeyboardAvoidingView behavior="padding" style={[styles.flex, { backgroundColor: t.pane }]}>
       <ScrollView
         contentContainerStyle={[styles.wrap, { paddingTop: insets.top + 20, paddingBottom: insets.bottom + 20, paddingLeft: insets.left + 20, paddingRight: insets.right + 20 }]}
         keyboardShouldPersistTaps="handled">

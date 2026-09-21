@@ -4,11 +4,18 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { alarms } from '../lib/alarms';
 import { links } from '../lib/supabase';
 import { useStore } from '../store/useStore';
+import { AppearanceMode } from '../lib/appearance';
 import { AlertType } from '../types';
 import { ErrorBanner } from './common';
 import { isMac, useTheme } from './theme';
 
 const TEST_DELAY_S = 5;
+
+const APPEARANCE_OPTIONS = [
+  { mode: AppearanceMode.System, label: 'Automatic' },
+  { mode: AppearanceMode.Light, label: 'Light' },
+  { mode: AppearanceMode.Dark, label: 'Dark' },
+];
 
 export function SettingsScreen({ bottomInset }: { bottomInset: number }) {
   const t = useTheme();
@@ -23,6 +30,8 @@ export function SettingsScreen({ bottomInset }: { bottomInset: number }) {
   const nativeAlarms = useStore(s => s.nativeAlarms);
   const requestAlarmPermission = useStore(s => s.requestAlarmPermission);
   const showToast = useStore(s => s.showToast);
+  const appearance = useStore(s => s.appearance);
+  const setAppearance = useStore(s => s.setAppearance);
   const notes = useStore(s => s.notes);
   const reminders = useStore(s => s.reminders);
   const lists = useStore(s => s.lists);
@@ -89,6 +98,24 @@ export function SettingsScreen({ bottomInset }: { bottomInset: number }) {
           <Row label="Open reminders" value={String(reminderCount)} />
           <Row label="Folders" value={String(Object.keys(lists).length)} last />
         </Card>
+
+        <SectionLabel text="Appearance" />
+        <View style={[styles.segment, { backgroundColor: t.pane, borderColor: t.border }]} accessibilityRole="radiogroup">
+          {APPEARANCE_OPTIONS.map(({ mode, label }) => {
+            const selected = appearance === mode;
+            return (
+              <Pressable
+                key={mode}
+                testID={`appearance-${mode}`}
+                accessibilityRole="radio"
+                accessibilityState={{ checked: selected }}
+                onPress={() => setAppearance(mode)}
+                style={[styles.segmentItem, selected && { backgroundColor: t.accentFill }]}>
+                <Text style={[styles.segmentText, { color: selected ? t.onAccent : t.text }]}>{label}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
 
         <SectionLabel text="Alerts on this device" />
         <Card>
@@ -189,6 +216,9 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 12, minHeight: 44, gap: 12 },
   rowLabel: { fontSize: 15 },
   rowValue: { fontSize: 15, flexShrink: 1, textAlign: 'right' },
+  segment: { flexDirection: 'row', borderRadius: 12, borderWidth: StyleSheet.hairlineWidth, padding: 4, gap: 4, marginBottom: 10 },
+  segmentItem: { flex: 1, minHeight: 40, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
+  segmentText: { fontSize: 14, fontWeight: '600' },
   help: { fontSize: 13, lineHeight: 18, marginHorizontal: 4, marginBottom: 12 },
   inlineHelp: { fontSize: 12, lineHeight: 17, paddingHorizontal: 14, paddingBottom: 10 },
 });

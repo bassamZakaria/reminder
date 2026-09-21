@@ -249,7 +249,7 @@ const styles = StyleSheet.create({
   buttonText: { fontWeight: '600', fontSize: 15 },
   input: { borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 15 },
   iconButton: { minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
-  empty: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 },
+  empty: { flex: 1, alignItems: 'center', justifyContent: 'flex-start', paddingHorizontal: 32, paddingTop: 56, paddingBottom: 32 },
   emptyIcon: { width: 72, height: 72, borderRadius: 36, alignItems: 'center', justifyContent: 'center', marginBottom: 14 },
   emptyGlyph: { fontSize: 32 },
   emptyTitle: { fontSize: 17, fontWeight: '700' },
