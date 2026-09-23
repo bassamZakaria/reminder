@@ -21,4 +21,4 @@ curl -sS -o /dev/null -X POST "$API_URL/auth/v1/admin/users" \
   -d "{\"email\":\"$EMAIL\",\"password\":\"$PASSWORD\",\"email_confirm\":true}"
 
 echo "==> Running Maestro flows"
-"${MAESTRO:-maestro}" ${DEVICE:+--device "$DEVICE"} test -e EMAIL="$EMAIL" -e PASSWORD="$PASSWORD" -e NEW_EMAIL="new-$EMAIL" --test-output-dir .maestro/output "$@" "${FLOWS:-.maestro}"
+"${MAESTRO:-maestro}" ${DEVICE:+--device "$DEVICE"} test -e EMAIL="$EMAIL" -e PASSWORD="$PASSWORD" -e NEW_EMAIL="new-$EMAIL" -e SAVE_PASSWORD_SHEET="${SAVE_PASSWORD_SHEET:-false}" -e SYSTEM_ALERT_POINT="${SYSTEM_ALERT_POINT:-off}" --test-output-dir .maestro/output "$@" "${FLOWS:-.maestro}"

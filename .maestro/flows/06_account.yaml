@@ -51,14 +51,14 @@ name: 06_account
     commands:
       - tapOn:
           text: "Delete Account"
-          above: "Cancel"
+          below: "Manage Subscription"
 - runFlow:
     when:
       platform: Android
     commands:
       - tapOn:
           text: "(?i)delete account"
-          rightOf: "(?i)cancel"
+          rightOf: "(?i)manage subscription"
 - extendedWaitUntil:
     visible:
       id: "email"

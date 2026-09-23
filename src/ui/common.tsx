@@ -182,6 +182,7 @@ export function PromptSheet({
 }
 
 const TOAST_MS = 4500;
+const TOAST_UNDO_MS = 7000;
 
 export function ToastHost({ bottomInset }: { bottomInset: number }) {
   const t = useTheme();
@@ -197,7 +198,7 @@ export function ToastHost({ bottomInset }: { bottomInset: number }) {
     }
     anim.setValue(0);
     Animated.spring(anim, { toValue: 1, useNativeDriver: true, friction: 8 }).start();
-    const timer = setTimeout(dismissToast, TOAST_MS);
+    const timer = setTimeout(dismissToast, toast.undo ? TOAST_UNDO_MS : TOAST_MS);
     return () => clearTimeout(timer);
   }, [toast, anim, dismissToast]);
 

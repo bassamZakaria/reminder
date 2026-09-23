@@ -87,6 +87,10 @@ RCT_EXPORT_METHOD(alarmsSupported:(RCTPromiseResolveBlock)resolve rejecter:(RCTP
   resolve(@([AlarmKitBridge isSupported]));
 }
 
+RCT_EXPORT_METHOD(alarmPermissionStatus:(RCTPromiseResolveBlock)resolve rejecter:(RCTPromiseRejectBlock)reject) {
+  resolve([AlarmKitBridge isSupported] ? (id)@([AlarmKitBridge isAuthorized]) : (id)[NSNull null]);
+}
+
 RCT_EXPORT_METHOD(requestAlarmPermission:(RCTPromiseResolveBlock)resolve rejecter:(RCTPromiseRejectBlock)reject) {
   [AlarmKitBridge requestAuthorization:^(BOOL granted) {
     resolve(@(granted));
@@ -105,7 +109,7 @@ RCT_EXPORT_METHOD(schedule:(NSString *)identifier
   NSDate *fireDate = [NSDate dateWithTimeIntervalSince1970:fireAtMs / 1000.0];
   BOOL wantsAlarm = [alertType isEqualToString:@"alarm"];
 
-  if (wantsAlarm && [AlarmKitBridge isSupported] && [AlarmKitBridge supportsRepeat:repeat]) {
+  if (wantsAlarm && [AlarmKitBridge isSupported] && [AlarmKitBridge isAuthorized] && [AlarmKitBridge supportsRepeat:repeat]) {
     [[UNUserNotificationCenter currentNotificationCenter] removePendingNotificationRequestsWithIdentifiers:@[identifier]];
     [AlarmKitBridge scheduleWithId:identifier title:title body:body ?: @"" fireAt:fireDate repeatRule:repeat snoozeMinutes:10 completion:^(NSError *error) {
       if (error) { reject(@"alarm_error", error.localizedDescription, error); return; }

@@ -18,6 +18,35 @@ appId: com.bassamsalah.recall
 - tapOn:
     id: "sign-in"
 - runFlow: system_prompts.yaml
+- waitForAnimationToEnd:
+    timeout: 5000
+- runFlow: system_prompts.yaml
+# iOS draws "Save Password?" in another process, so it never reaches the view hierarchy and
+# can only be dismissed by tapping where its "Not Now" button sits.
+- runFlow:
+    when:
+      true: ${SAVE_PASSWORD_SHEET == 'true'}
+      notVisible: "Reminders"
+    commands:
+      - tapOn:
+          point: "43%,58%"
+      - waitForAnimationToEnd:
+          timeout: 3000
 - extendedWaitUntil:
     visible: "Reminders"
     timeout: 30000
+# Scheduling the synced reminders triggers the alarm permission prompt a moment after the list loads.
+# iOS draws it in another process, so it never reaches the view hierarchy and can only be dismissed
+# by tapping where its "Allow" button sits.
+- waitForAnimationToEnd:
+    timeout: 4000
+- runFlow: system_prompts.yaml
+- runFlow:
+    when:
+      true: ${SYSTEM_ALERT_POINT != 'off'}
+      notVisible: "Search reminders"
+    commands:
+      - tapOn:
+          point: ${SYSTEM_ALERT_POINT}
+      - waitForAnimationToEnd:
+          timeout: 3000

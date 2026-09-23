@@ -21,6 +21,15 @@ struct RecallAlarmMetadata: AlarmMetadata {}
     return repeatRule == "none" || repeatRule == "daily" || repeatRule == "weekly"
   }
 
+  @objc public static func isAuthorized() -> Bool {
+    #if os(iOS) && canImport(AlarmKit)
+    if #available(iOS 26.0, *) {
+      return AlarmManager.shared.authorizationState == .authorized
+    }
+    #endif
+    return false
+  }
+
   @objc public static func requestAuthorization(_ completion: @escaping (Bool) -> Void) {
     #if os(iOS) && canImport(AlarmKit)
     if #available(iOS 26.0, *) {
