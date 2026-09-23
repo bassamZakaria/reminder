@@ -3,7 +3,8 @@ import { Pressable, ScrollView, StyleSheet, Text, View, type NativeScrollEvent, 
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { isSameDay } from '../lib/schedule';
 import { Overlay, OverlayAnimation } from './Overlay';
-import { isDesktop, useTheme } from './theme';
+import { useIsWide } from './layout';
+import { useTheme } from './theme';
 
 enum Meridiem {
   AM = 'AM',
@@ -18,6 +19,7 @@ const MINUTES = Array.from({ length: 12 }, (_, i) => i * 5);
 export function DateTimeSheet({ visible, value, onCancel, onConfirm }: { visible: boolean; value: Date | null; onCancel: () => void; onConfirm: (d: Date) => void }) {
   const t = useTheme();
   const insets = useSafeAreaInsets();
+  const wide = useIsWide();
   const [draft, setDraft] = useState(() => value ?? defaultDate());
   const [month, setMonth] = useState(() => startOfMonth(value ?? defaultDate()));
 
@@ -66,11 +68,11 @@ export function DateTimeSheet({ visible, value, onCancel, onConfirm }: { visible
   const pm = draft.getHours() >= 12;
 
   return (
-    <Overlay visible={visible} animationType={isDesktop ? OverlayAnimation.Fade : OverlayAnimation.Slide} onRequestClose={onCancel}>
-      <View style={styles.backdrop}>
+    <Overlay visible={visible} animationType={wide ? OverlayAnimation.Fade : OverlayAnimation.Slide} onRequestClose={onCancel}>
+      <View style={[styles.backdrop, { justifyContent: wide ? 'center' : 'flex-end' }]}>
         <Pressable style={StyleSheet.absoluteFill} onPress={onCancel} />
-        <View style={[styles.sheet, { backgroundColor: t.bg, paddingBottom: insets.bottom + 16, maxWidth: isDesktop ? 380 : undefined, paddingTop: isDesktop ? 16 : 6, alignSelf: isDesktop ? 'center' : 'stretch', borderRadius: isDesktop ? 16 : 0, borderTopLeftRadius: 16, borderTopRightRadius: 16 }]}>
-          {!isDesktop ? (
+        <View style={[styles.sheet, { backgroundColor: t.bg, paddingBottom: insets.bottom + 16, maxWidth: wide ? 380 : undefined, paddingTop: wide ? 16 : 6, alignSelf: wide ? 'center' : 'stretch', borderRadius: wide ? 16 : 0, borderTopLeftRadius: 16, borderTopRightRadius: 16 }]}>
+          {!wide ? (
             <View style={styles.grabber}>
               <View style={[styles.grabberBar, { backgroundColor: t.border }]} />
             </View>
@@ -236,7 +238,7 @@ function shiftMonth(d: Date, n: number): Date {
 }
 
 const styles = StyleSheet.create({
-  backdrop: { flex: 1, justifyContent: isDesktop ? 'center' : 'flex-end', backgroundColor: 'rgba(0,0,0,0.35)' },
+  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.35)' },
   sheet: { paddingHorizontal: 16, paddingTop: 6 },
   grabber: { alignItems: 'center', paddingVertical: 8 },
   grabberBar: { width: 38, height: 4, borderRadius: 2 },

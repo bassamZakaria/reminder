@@ -2,11 +2,10 @@ import { useMemo } from 'react';
 import { Platform } from 'react-native';
 import { create } from 'zustand';
 import type { RealtimeChannel, Session } from '@supabase/supabase-js';
-import { supabase } from '../lib/supabase';
 import { AppearanceMode, applyAppearance, loadAppearance, saveAppearance } from '../lib/appearance';
 import { blockedFeature, canAddReminder, PremiumFeature } from '../lib/premium';
 import { NO_ENTITLEMENT, PurchaseStatus, purchases, StoreState, type Entitlement, type ProductId, type StoreProduct } from '../lib/purchases';
-import { links } from '../lib/supabase';
+import { links, supabase } from '../lib/supabase';
 import { alarms, NotificationAction, type AlarmFiredEvent, type NotificationActionEvent } from '../lib/alarms';
 import { nextAfterCompletion, noteHeadline, SNOOZE_SUFFIX } from '../lib/schedule';
 import { AlertType, RepeatRule, ViewKind, type List, type Note, type Reminder, type View } from '../types';
@@ -62,6 +61,7 @@ interface State {
   storeState: StoreState;
   paywall: PremiumFeature | null;
   purchasing: ProductId | null;
+  recovery: boolean;
 
   init(): Promise<void>;
   setAppearance(mode: AppearanceMode): void;
@@ -74,6 +74,8 @@ interface State {
   info: string | null;
   signIn(email: string, password: string): Promise<void>;
   signUp(email: string, password: string): Promise<void>;
+  resetPassword(email: string): Promise<void>;
+  updatePassword(password: string): Promise<boolean>;
   signOut(): Promise<void>;
   deleteAccount(): Promise<boolean>;
   requestNotificationPermission(): void;
@@ -166,6 +168,20 @@ function alarmIds(reminderIds: string[]): string[] {
   return reminderIds.flatMap(id => [id, id + SNOOZE_SUFFIX]);
 }
 
+export const MIN_PASSWORD = 8;
+
+enum AuthEvent {
+  PasswordRecovery = 'PASSWORD_RECOVERY',
+}
+
+function resetOptions(): { redirectTo?: string } {
+  const origin = (globalThis as { location?: { origin?: string } }).location?.origin;
+  if (Platform.OS === 'web' && origin) {
+    return { redirectTo: origin };
+  }
+  return links.webUrl ? { redirectTo: links.webUrl } : {};
+}
+
 export function friendlyError(message: string): string {
   if (/network request failed|failed to fetch|load failed/i.test(message)) {
     return 'Can’t reach the server. Check your connection and try again.';
@@ -180,7 +196,10 @@ export function friendlyError(message: string): string {
     return 'An account with this email already exists. Sign in instead.';
   }
   if (/password should be at least/i.test(message)) {
-    return 'Use a password with at least 6 characters.';
+    return `Use a password with at least ${MIN_PASSWORD} characters.`;
+  }
+  if (/timed out|timeout|504/i.test(message)) {
+    return 'The server is busy. Try again in a moment.';
   }
   if (/issued at future/i.test(message)) {
     return 'This device’s clock is out of sync. Turn on “Set time automatically”, then retry.';
@@ -278,6 +297,7 @@ export const useStore = create<State>((set, get) => ({
   storeState: StoreState.Idle,
   paywall: null,
   purchasing: null,
+  recovery: false,
 
   isPremium: () => links.forcePremium || get().entitlement.active || remoteIsActive(get().remoteEntitlement),
 
@@ -353,8 +373,11 @@ export const useStore = create<State>((set, get) => ({
     });
     const { data } = await supabase.auth.getSession();
     set({ session: data.session, authReady: true });
-    supabase.auth.onAuthStateChange((_event, session) => {
+    supabase.auth.onAuthStateChange((event, session) => {
       setTimeout(() => {
+        if (event === AuthEvent.PasswordRecovery) {
+          set({ recovery: true });
+        }
         const hadUser = get().session?.user.id;
         set({ session });
         if (session && session.user.id !== hadUser) {
@@ -363,6 +386,7 @@ export const useStore = create<State>((set, get) => ({
         }
         if (!session) {
           teardownRealtime();
+          set({ recovery: false });
           set({ notes: {}, reminders: {}, lists: {}, editor: null, view: { kind: ViewKind.Reminders }, activeAlarm: null, toast: null, error: null, permissionGranted: null });
           alarms.cancelAll();
           resetReady();
@@ -405,6 +429,24 @@ export const useStore = create<State>((set, get) => ({
     set({ loading: false, info: data.session ? null : `We sent a confirmation link to ${email}. Open it, then sign in.` });
   },
 
+  async resetPassword(email) {
+    set({ error: null, info: null, loading: true });
+    const { error } = await supabase.auth.resetPasswordForEmail(email, resetOptions());
+    set({ loading: false, error: error ? friendlyError(error.message) : null, info: error ? null : `We sent a password reset link to ${email}. Open it to choose a new password.` });
+  },
+
+  async updatePassword(password) {
+    set({ error: null, info: null, loading: true });
+    const { error } = await supabase.auth.updateUser({ password });
+    if (error) {
+      set({ loading: false, error: friendlyError(error.message) });
+      return false;
+    }
+    set({ loading: false, recovery: false });
+    get().showToast('Password updated.');
+    return true;
+  },
+
   async signOut() {
     await supabase.auth.signOut();
   },
@@ -418,6 +460,7 @@ export const useStore = create<State>((set, get) => ({
       return false;
     }
     await supabase.auth.signOut({ scope: 'local' });
+    set({ info: 'Your account and all of its data were deleted.' });
     return true;
   },
 

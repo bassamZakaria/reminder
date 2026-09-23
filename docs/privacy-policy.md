@@ -12,6 +12,8 @@ Recall is a notes and reminders app for iPhone, Mac, Android and the web. This p
 | Your notes, reminders and folders | To store them and sync them between your devices | Yes |
 | Subscription status (active, plan, renewal date) | To unlock Premium on all of your devices | Yes |
 
+Recall's terms are in the [Terms of Use](terms.md).
+
 That is all. Recall does not collect your location, contacts, device identifiers, advertising identifiers, analytics or crash data, and it does not track you across other companies' apps or websites.
 
 ## How your data is stored
@@ -30,7 +32,9 @@ We do not sell, rent or share your data with anyone. We do not use it for advert
 
 ## Keeping and deleting your data
 
-Your data is kept while your account exists. You can delete your account at any time from **Settings › Delete Account** in the app. This immediately and permanently deletes your account and all of your notes, reminders and folders from our servers.
+Your data is kept while your account exists. You can delete your account at any time from **Settings › Delete Account** in the app. This immediately and permanently deletes your account and all of your notes, reminders and folders from our servers. If you no longer have the app, email us and we will delete it for you within 30 days.
+
+Deleting your account does not cancel a Recall Premium subscription. Cancel that in your Apple ID or Google Play subscription settings.
 
 ## Children
 

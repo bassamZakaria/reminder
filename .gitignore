@@ -85,3 +85,4 @@ supabase/.temp/
 
 # Web build
 dist-web/
+.playwright-mcp/

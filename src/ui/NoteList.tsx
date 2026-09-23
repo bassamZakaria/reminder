@@ -8,13 +8,15 @@ import { EditorKind, useLists, useNotes, useReminders, useStore } from '../store
 import { LIST_COLORS, ViewKind, type List, type Note } from '../types';
 import { ActionMenu, Empty, ErrorBanner, IconButton, Input, PromptSheet, type MenuAction } from './common';
 import { NoteRow } from './NoteRow';
-import { isDesktop, useTheme } from './theme';
+import { useIsWide } from './layout';
+import { useTheme } from './theme';
 
 const NO_REMINDERS: never[] = [];
 
 export function NoteList({ bottomInset }: { bottomInset: number }) {
   const t = useTheme();
   const insets = useSafeAreaInsets();
+  const wide = useIsWide();
   const notes = useNotes();
   const reminders = useReminders();
   const view = useStore(s => s.view);
@@ -55,11 +57,11 @@ export function NoteList({ bottomInset }: { bottomInset: number }) {
 
   const empty = search
     ? { icon: '🔍', title: 'No results', hint: `Nothing matches “${search.trim()}”.` }
-    : { icon: '🗒️', title: folder ? `No notes in ${folder.name}` : 'No notes yet', hint: isDesktop ? 'Press ＋ to write a note.' : 'Tap ＋ to write a note.' };
+    : { icon: '🗒️', title: folder ? `No notes in ${folder.name}` : 'No notes yet', hint: wide ? 'Press ＋ to write a note.' : 'Tap ＋ to write a note.' };
 
   return (
     <View style={[styles.wrap, { backgroundColor: t.bg }]}>
-      <View style={[styles.header, { paddingTop: isDesktop ? 14 : insets.top + 6, paddingLeft: insets.left + 16, paddingRight: insets.right + 12 }]}>
+      <View style={[styles.header, { paddingTop: wide ? 14 : insets.top + 6, paddingLeft: insets.left + 16, paddingRight: insets.right + 12 }]}>
         <View style={styles.headerText}>
           <Text numberOfLines={1} style={[styles.title, { color: t.text }]} accessibilityRole="header">
             {folder?.name ?? 'Notes'}
@@ -68,20 +70,20 @@ export function NoteList({ bottomInset }: { bottomInset: number }) {
             {count} {count === 1 ? 'note' : 'notes'}
           </Text>
         </View>
-        {isDesktop ? <IconButton testID="new-note" label="＋" size={22} accessibilityLabel="New note" onPress={newNote} /> : null}
+        {wide ? <IconButton testID="new-note" label="＋" size={22} accessibilityLabel="New note" onPress={newNote} /> : null}
       </View>
 
       <View style={[styles.controls, { paddingLeft: insets.left + 12, paddingRight: insets.right + 12 }]}>
         <Input testID="search" placeholder="Search notes" value={search} onChangeText={setSearch} clearButtonMode="while-editing" autoCorrect={false} style={styles.search} />
       </View>
-      {!isDesktop ? <FolderChips /> : null}
+      {!wide ? <FolderChips /> : null}
 
       <ErrorBanner />
 
       <SectionList
         sections={sections}
         keyExtractor={n => n.id}
-        renderItem={({ item }) => <NoteRow note={item} reminders={byNote[item.id] ?? NO_REMINDERS} showFolder={!folderId} onLongPress={onLongPress} />}
+        renderItem={({ item }) => <NoteRow note={item} wide={wide} reminders={byNote[item.id] ?? NO_REMINDERS} showFolder={!folderId} onLongPress={onLongPress} />}
         renderSectionHeader={({ section }) => (
           <Text style={[styles.sectionTitle, { color: t.muted, backgroundColor: t.bg }]}>{section.key === SectionKey.Pinned ? '📌 Pinned' : section.title}</Text>
         )}
@@ -89,7 +91,7 @@ export function NoteList({ bottomInset }: { bottomInset: number }) {
         contentContainerStyle={sections.length === 0 ? styles.emptyContainer : { paddingBottom: bottomInset + 90 }}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
-        refreshControl={isDesktop ? undefined : <RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={t.muted} />}
+        refreshControl={wide ? undefined : <RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={t.muted} />}
         ListEmptyComponent={<Empty icon={empty.icon} title={empty.title} hint={empty.hint} />}
       />
 

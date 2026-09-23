@@ -2,7 +2,7 @@ import React, { useRef, useState } from 'react';
 import { KeyboardAvoidingView, Linking, Pressable, ScrollView, StyleSheet, Text, View, type TextInput } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { isConfigured, links } from '../lib/supabase';
-import { useStore } from '../store/useStore';
+import { MIN_PASSWORD, useStore } from '../store/useStore';
 import { Button, Input } from './common';
 import { useTheme } from './theme';
 
@@ -11,12 +11,11 @@ enum AuthMode {
   SignUp = 'sign-up',
 }
 
-const MIN_PASSWORD = 8;
-
 export function AuthScreen() {
   const t = useTheme();
   const signIn = useStore(s => s.signIn);
   const signUp = useStore(s => s.signUp);
+  const resetPassword = useStore(s => s.resetPassword);
   const loading = useStore(s => s.loading);
   const error = useStore(s => s.error);
   const info = useStore(s => s.info);
@@ -28,7 +27,8 @@ export function AuthScreen() {
   const insets = useSafeAreaInsets();
   const signingUp = mode === AuthMode.SignUp;
   const passwordOk = signingUp ? password.length >= MIN_PASSWORD : password.length > 0;
-  const canSubmit = !loading && /\S+@\S+\.\S+/.test(email.trim()) && passwordOk && isConfigured;
+  const emailOk = /\S+@\S+\.\S+/.test(email.trim());
+  const canSubmit = !loading && emailOk && passwordOk && isConfigured;
   const submit = () => {
     if (canSubmit) {
       (signingUp ? signUp : signIn)(email.trim(), password);
@@ -97,6 +97,16 @@ export function AuthScreen() {
               {info}
             </Text>
           ) : null}
+          {!signingUp ? (
+            <Pressable
+              testID="forgot-password"
+              accessibilityRole="button"
+              disabled={loading || !emailOk || !isConfigured}
+              onPress={() => resetPassword(email.trim())}
+              style={({ pressed }) => [styles.forgot, { opacity: pressed ? 0.6 : 1 }]}>
+              <Text style={[styles.forgotText, { color: emailOk && isConfigured ? t.accent : t.muted }]}>Forgot password?</Text>
+            </Pressable>
+          ) : null}
           <Button testID="sign-in" title={loading ? 'Please wait…' : signingUp ? 'Create account' : 'Sign in'} disabled={!canSubmit} onPress={submit} style={styles.submit} />
           <Pressable
             testID="switch-mode"
@@ -137,6 +147,8 @@ const styles = StyleSheet.create({
   eye: { marginBottom: 10, borderRadius: 10, paddingHorizontal: 14, minHeight: 44, justifyContent: 'center' },
   eyeText: { fontSize: 15, fontWeight: '600' },
   message: { marginBottom: 10, fontSize: 14, lineHeight: 20 },
+  forgot: { minHeight: 44, justifyContent: 'center', alignSelf: 'flex-end' },
+  forgotText: { fontSize: 14, fontWeight: '600' },
   submit: { marginTop: 6, minHeight: 48 },
   switch: { minHeight: 44, alignItems: 'center', justifyContent: 'center', marginTop: 6 },
   switchText: { fontSize: 14 },

@@ -62,7 +62,9 @@ cat > app.config.json <<JSON
   "supabaseUrl": "$URL",
   "supabaseAnonKey": "$ANON_KEY",
   "privacyPolicyUrl": "${PRIVACY_POLICY_URL:-}",
-  "supportUrl": "${SUPPORT_URL:-}"
+  "supportUrl": "${SUPPORT_URL:-}",
+  "termsUrl": "${TERMS_URL:-}",
+  "webUrl": "${WEB_URL:-}"
 }
 JSON
 echo "==> Wrote app.config.json"
@@ -90,6 +92,22 @@ echo "==> Configuring auth: public sign-ups with email confirmation, 8+ characte
 curl -sS -f -o /dev/null -X PATCH "https://api.supabase.com/v1/projects/$REF/config/auth" \
   -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" -H "Content-Type: application/json" \
   -d '{"disable_signup": false, "mailer_autoconfirm": false, "password_min_length": 8}'
+
+if [ -n "${WEB_URL:-}" ]; then
+  echo "==> Setting the site URL so password reset links open the web app"
+  curl -sS -f -o /dev/null -X PATCH "https://api.supabase.com/v1/projects/$REF/config/auth" \
+    -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" -H "Content-Type: application/json" \
+    -d "$(WEB_URL="$WEB_URL" node -e 'console.log(JSON.stringify({site_url:process.env.WEB_URL,uri_allow_list:process.env.WEB_URL}))')"
+fi
+
+if [ -n "${SMTP_HOST:-}" ] && [ -n "${SMTP_USER:-}" ] && [ -n "${SMTP_PASS:-}" ] && [ -n "${SMTP_SENDER:-}" ]; then
+  echo "==> Configuring custom SMTP so confirmation and reset emails reach real users"
+  curl -sS -f -o /dev/null -X PATCH "https://api.supabase.com/v1/projects/$REF/config/auth" \
+    -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" -H "Content-Type: application/json" \
+    -d "$(node -e 'console.log(JSON.stringify({external_email_enabled:true,smtp_admin_email:process.env.SMTP_SENDER,smtp_host:process.env.SMTP_HOST,smtp_port:Number(process.env.SMTP_PORT||587),smtp_user:process.env.SMTP_USER,smtp_pass:process.env.SMTP_PASS,smtp_sender_name:process.env.SMTP_SENDER_NAME||"Recall"}))')"
+else
+  echo "==> No SMTP configured. Supabase's built-in mailer only delivers to project members, so public sign-ups and password resets will not reach real users until you set SMTP_HOST/SMTP_USER/SMTP_PASS/SMTP_SENDER." >&2
+fi
 
 if command -v gh >/dev/null && gh repo view >/dev/null 2>&1; then
   echo "==> Setting GitHub secrets for the keep-alive workflow"

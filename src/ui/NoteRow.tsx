@@ -4,17 +4,19 @@ import { formatDue, formatRelative, formatReminderTime } from '../lib/dates';
 import { firstLine, isSameDay } from '../lib/schedule';
 import { EditorKind, useStore } from '../store/useStore';
 import { AlertType, RepeatRule, type Note, type Reminder } from '../types';
-import { isDesktop, useTheme } from './theme';
+import { useTheme } from './theme';
 
 const MAX_CHIPS = 2;
 
 export const NoteRow = memo(function NoteRow({
   note,
+  wide,
   reminders,
   showFolder = true,
   onLongPress,
 }: {
   note: Note;
+  wide: boolean;
   reminders: Reminder[];
   showFolder?: boolean;
   onLongPress?: (note: Note) => void;
@@ -40,7 +42,7 @@ export const NoteRow = memo(function NoteRow({
       delayLongPress={350}
       style={({ pressed, hovered }: { pressed: boolean; hovered?: boolean }) => [
         styles.row,
-        { backgroundColor: selected && isDesktop ? t.selected : pressed || hovered ? t.hover : 'transparent' },
+        { backgroundColor: selected && wide ? t.selected : pressed || hovered ? t.hover : 'transparent' },
       ]}>
       <View style={[styles.icon, { backgroundColor: open.length ? t.accentSoft : t.pane }]}>
         <Text style={[styles.glyph, { color: open.length ? t.accent : t.muted }]}>{open.length ? '⏰' : '≡'}</Text>

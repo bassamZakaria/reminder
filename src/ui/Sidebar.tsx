@@ -5,13 +5,15 @@ import { PremiumFeature } from '../lib/premium';
 import { useLists, useNotes, useReminders, useStore } from '../store/useStore';
 import { LIST_COLORS, ViewKind, type List, type View as AppView } from '../types';
 import { ActionMenu, Input, PromptSheet } from './common';
-import { isDesktop, useTheme } from './theme';
+import { useIsWide } from './layout';
+import { useTheme } from './theme';
 
 function sameView(a: AppView, b: AppView): boolean {
   return a.kind === b.kind && ('id' in a && 'id' in b ? a.id === b.id : true);
 }
 
 function NavItem({
+  wide,
   active,
   icon,
   label,
@@ -22,6 +24,7 @@ function NavItem({
   onLongPress,
   testID,
 }: {
+  wide: boolean;
   active: boolean;
   icon?: string;
   label: string;
@@ -42,10 +45,10 @@ function NavItem({
       onLongPress={onLongPress}
       style={({ pressed, hovered }: { pressed: boolean; hovered?: boolean }) => [
         styles.nav,
-        { backgroundColor: active ? t.selected : pressed || hovered ? t.hover : 'transparent' },
+        { paddingVertical: wide ? 7 : 11, backgroundColor: active ? t.selected : pressed || hovered ? t.hover : 'transparent' },
       ]}>
       {color ? <View style={[styles.dot, { backgroundColor: color }]} /> : <Text style={styles.icon}>{icon}</Text>}
-      <Text numberOfLines={1} style={[styles.navLabel, { color: t.text, fontWeight: active ? '700' : '500' }]}>
+      <Text numberOfLines={1} style={[styles.navLabel, { fontSize: wide ? 14 : 16, color: t.text, fontWeight: active ? '700' : '500' }]}>
         {label}
       </Text>
       {alert ? (
@@ -76,6 +79,7 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   const [menuFolder, setMenuFolder] = useState<List | null>(null);
   const [renaming, setRenaming] = useState<List | null>(null);
   const insets = useSafeAreaInsets();
+  const wide = useIsWide();
 
   const counts = useMemo(() => {
     const out: Record<string, number> = {};
@@ -114,11 +118,11 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   };
 
   return (
-    <View style={[styles.sidebar, { backgroundColor: t.sidebar, borderRightColor: t.border }]}>
-      <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingTop: isDesktop ? 34 : insets.top + 12, paddingBottom: insets.bottom + 16 }}>
-        {!isDesktop ? <Text style={[styles.brand, { color: t.text }]}>Recall</Text> : null}
-        <NavItem testID="nav-reminders" active={sameView(view, { kind: ViewKind.Reminders })} icon="⏰" label="Reminders" count={openReminders.length} alert={overdue} onPress={() => go({ kind: ViewKind.Reminders })} />
-        <NavItem testID="nav-notes" active={sameView(view, { kind: ViewKind.Notes })} icon="🗒️" label="Notes" count={notes.length} onPress={() => go({ kind: ViewKind.Notes })} />
+    <View style={[styles.sidebar, wide ? styles.sidebarWide : styles.sidebarNarrow, { backgroundColor: t.sidebar, borderRightColor: t.border }]}>
+      <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingTop: wide ? 34 : insets.top + 12, paddingBottom: insets.bottom + 16 }}>
+        {!wide ? <Text style={[styles.brand, { color: t.text }]}>Recall</Text> : null}
+        <NavItem wide={wide} testID="nav-reminders" active={sameView(view, { kind: ViewKind.Reminders })} icon="⏰" label="Reminders" count={openReminders.length} alert={overdue} onPress={() => go({ kind: ViewKind.Reminders })} />
+        <NavItem wide={wide} testID="nav-notes" active={sameView(view, { kind: ViewKind.Notes })} icon="🗒️" label="Notes" count={notes.length} onPress={() => go({ kind: ViewKind.Notes })} />
 
         <View style={styles.groupRow}>
           <Text style={[styles.groupLabel, { color: t.muted }]}>FOLDERS</Text>
@@ -148,6 +152,7 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
         ) : null}
         {folders.map(f => (
           <NavItem
+            wide={wide}
             key={f.id}
             testID={`folder-${f.name}`}
             active={sameView(view, { kind: ViewKind.Folder, id: f.id })}
@@ -159,10 +164,10 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
           />
         ))}
         {folders.length === 0 && !adding ? <Text style={[styles.hint, { color: t.muted }]}>Group notes into folders like Work or Home.</Text> : null}
-        {folders.length > 0 ? <Text style={[styles.hint, { color: t.muted }]}>{isDesktop ? 'Long-click' : 'Long-press'} a folder to rename or delete it.</Text> : null}
+        {folders.length > 0 ? <Text style={[styles.hint, { color: t.muted }]}>{wide ? 'Long-click' : 'Long-press'} a folder to rename or delete it.</Text> : null}
 
         <View style={styles.spacer} />
-        <NavItem testID="nav-settings" active={sameView(view, { kind: ViewKind.Settings })} icon="⚙️" label="Settings" onPress={() => go({ kind: ViewKind.Settings })} />
+        <NavItem wide={wide} testID="nav-settings" active={sameView(view, { kind: ViewKind.Settings })} icon="⚙️" label="Settings" onPress={() => go({ kind: ViewKind.Settings })} />
       </ScrollView>
 
       <ActionMenu
@@ -196,13 +201,15 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
 }
 
 const styles = StyleSheet.create({
-  sidebar: isDesktop ? { width: 230, flexGrow: 0, flexShrink: 0, borderRightWidth: StyleSheet.hairlineWidth } : { flex: 1, borderRightWidth: StyleSheet.hairlineWidth },
+  sidebar: { borderRightWidth: StyleSheet.hairlineWidth },
+  sidebarWide: { width: 230, flexGrow: 0, flexShrink: 0 },
+  sidebarNarrow: { flex: 1 },
   brand: { fontSize: 28, fontWeight: '800', paddingHorizontal: 18, paddingBottom: 14, letterSpacing: -0.5 },
   groupRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 18, paddingTop: 22, paddingBottom: 6 },
   groupLabel: { fontSize: 11, fontWeight: '700', letterSpacing: 0.6 },
   groupAction: { fontSize: 13, fontWeight: '600' },
-  nav: { flexDirection: 'row', alignItems: 'center', marginHorizontal: 8, paddingVertical: isDesktop ? 7 : 11, paddingHorizontal: 10, borderRadius: 9 },
-  navLabel: { flex: 1, fontSize: isDesktop ? 14 : 16 },
+  nav: { flexDirection: 'row', alignItems: 'center', marginHorizontal: 8, paddingHorizontal: 10, borderRadius: 9 },
+  navLabel: { flex: 1 },
   count: { fontSize: 13 },
   alert: { minWidth: 18, height: 18, borderRadius: 9, paddingHorizontal: 5, alignItems: 'center', justifyContent: 'center', marginRight: 6 },
   alertText: { color: '#fff', fontSize: 11, fontWeight: '800' },

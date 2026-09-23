@@ -263,6 +263,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 78VKP3FU63;
 				ENABLE_BITCODE = NO;
+				CODE_SIGN_ENTITLEMENTS = Recall/Recall.entitlements;
 				INFOPLIST_FILE = Recall/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -276,6 +277,7 @@
 					"-lc++",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.bassamsalah.recall;
+				TARGETED_DEVICE_FAMILY = "1,2";
 				PRODUCT_NAME = Recall;
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;
@@ -292,6 +294,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 78VKP3FU63;
+				CODE_SIGN_ENTITLEMENTS = Recall/Recall.entitlements;
 				INFOPLIST_FILE = Recall/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -305,6 +308,7 @@
 					"-lc++",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.bassamsalah.recall;
+				TARGETED_DEVICE_FAMILY = "1,2";
 				PRODUCT_NAME = Recall;
 				SWIFT_VERSION = 5.0;
 				VERSIONING_SYSTEM = "apple-generic";

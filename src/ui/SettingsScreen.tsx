@@ -6,10 +6,11 @@ import { links } from '../lib/supabase';
 import { useStore } from '../store/useStore';
 import { AppearanceMode } from '../lib/appearance';
 import { FREE_REMINDER_LIMIT, PremiumFeature } from '../lib/premium';
-import { purchases } from '../lib/purchases';
+import { purchases, STORE_NAME } from '../lib/purchases';
 import { AlertType } from '../types';
 import { ErrorBanner } from './common';
-import { isDesktop, useTheme } from './theme';
+import { useIsWide } from './layout';
+import { useTheme } from './theme';
 
 const TEST_DELAY_S = 5;
 
@@ -52,6 +53,7 @@ export function SettingsScreen({ bottomInset }: { bottomInset: number }) {
   const reminderCount = Object.values(reminders).filter(r => !r.is_completed).length;
   const [pending, setPending] = useState<string[] | null>(null);
   const insets = useSafeAreaInsets();
+  const wide = useIsWide();
 
   useEffect(() => {
     let cancelled = false;
@@ -86,9 +88,12 @@ export function SettingsScreen({ bottomInset }: { bottomInset: number }) {
   const confirmDeleteAccount = () =>
     Alert.alert(
       'Delete your account?',
-      'This permanently deletes your account and all of your notes, reminders and folders on every device. This can’t be undone.',
+      `This permanently deletes your account and all of your notes, reminders and folders on every device. This can’t be undone.${
+        premium ? ` Deleting the account does not cancel your subscription: billing continues through ${STORE_NAME} until you cancel it in your subscription settings.` : ''
+      }`,
       [
         { text: 'Cancel', style: 'cancel' },
+        ...(premium && purchases.available ? [{ text: 'Manage Subscription', onPress: () => purchases.manage() }] : []),
         { text: 'Delete Account', style: 'destructive', onPress: () => deleteAccount() },
       ],
     );
@@ -97,13 +102,13 @@ export function SettingsScreen({ bottomInset }: { bottomInset: number }) {
 
   return (
     <View style={[styles.flex, { backgroundColor: t.bg }]}>
-      <View style={[styles.header, { paddingTop: isDesktop ? 14 : insets.top + 6, paddingLeft: insets.left + 16, paddingRight: insets.right + 16 }]}>
+      <View style={[styles.header, { paddingTop: wide ? 14 : insets.top + 6, paddingLeft: insets.left + 16, paddingRight: insets.right + 16 }]}>
         <Text style={[styles.title, { color: t.text }]} accessibilityRole="header">
           Settings
         </Text>
       </View>
       <ErrorBanner />
-      <ScrollView contentContainerStyle={[styles.content, { paddingBottom: (isDesktop ? insets.bottom : bottomInset) + 24, paddingLeft: insets.left + 16, paddingRight: insets.right + 16 }]}>
+      <ScrollView contentContainerStyle={[styles.content, { paddingBottom: (wide ? insets.bottom : bottomInset) + 24, paddingLeft: insets.left + 16, paddingRight: insets.right + 16 }]}>
         <SectionLabel text="Your data" />
         <Card>
           <Row label="Signed in as" value={session?.user.email ?? '—'} />
@@ -175,14 +180,15 @@ export function SettingsScreen({ bottomInset }: { bottomInset: number }) {
           <ActionRow testID="refresh" label={refreshing ? 'Refreshing…' : 'Refresh from cloud'} onPress={refresh} last />
         </Card>
         <Text style={[styles.help, { color: t.muted }]}>
-          Changes sync instantly between your devices.{isDesktop ? '' : ' Pull down on a list to refresh.'}
+          Changes sync instantly between your devices.{wide ? '' : ' Pull down on a list to refresh.'}
         </Text>
 
-        {links.privacyPolicyUrl || links.supportUrl ? (
+        {links.privacyPolicyUrl || links.termsUrl || links.supportUrl ? (
           <>
             <SectionLabel text="About" />
             <Card>
-              {links.privacyPolicyUrl ? <ActionRow label="Privacy Policy" onPress={() => Linking.openURL(links.privacyPolicyUrl!)} last={!links.supportUrl} /> : null}
+              {links.privacyPolicyUrl ? <ActionRow label="Privacy Policy" onPress={() => Linking.openURL(links.privacyPolicyUrl!)} last={!links.termsUrl && !links.supportUrl} /> : null}
+              {links.termsUrl ? <ActionRow label="Terms of Use" onPress={() => Linking.openURL(links.termsUrl!)} last={!links.supportUrl} /> : null}
               {links.supportUrl ? <ActionRow label="Help & Support" onPress={() => Linking.openURL(links.supportUrl!)} last /> : null}
             </Card>
           </>

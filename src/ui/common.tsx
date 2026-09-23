@@ -3,7 +3,8 @@ import { Animated, Pressable, StyleSheet, Text, TextInput, View, type TextInputP
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useStore } from '../store/useStore';
 import { Overlay } from './Overlay';
-import { isDesktop, useTheme } from './theme';
+import { useIsWide } from './layout';
+import { useTheme } from './theme';
 
 export enum ButtonKind {
   Primary = 'primary',
@@ -102,9 +103,10 @@ export interface MenuAction {
 export function ActionMenu({ visible, title, actions, onClose }: { visible: boolean; title?: string; actions: MenuAction[]; onClose: () => void }) {
   const t = useTheme();
   const insets = useSafeAreaInsets();
+  const wide = useIsWide();
   return (
     <Overlay visible={visible} onRequestClose={onClose}>
-      <View style={[styles.menuBackdrop, { backgroundColor: t.scrim, justifyContent: isDesktop ? 'center' : 'flex-end', paddingBottom: isDesktop ? 0 : insets.bottom + 10 }]}>
+      <View style={[styles.menuBackdrop, { backgroundColor: t.scrim, justifyContent: wide ? 'center' : 'flex-end', paddingBottom: wide ? 0 : insets.bottom + 10 }]}>
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel="Close menu" />
         <View style={[styles.menu, { backgroundColor: t.card }]}>
           {title ? (
@@ -183,6 +185,7 @@ const TOAST_MS = 4500;
 
 export function ToastHost({ bottomInset }: { bottomInset: number }) {
   const t = useTheme();
+  const wide = useIsWide();
   const toast = useStore(s => s.toast);
   const dismissToast = useStore(s => s.dismissToast);
   const undoDelete = useStore(s => s.undoDelete);
@@ -205,7 +208,7 @@ export function ToastHost({ bottomInset }: { bottomInset: number }) {
   return (
     <Animated.View
       pointerEvents="box-none"
-      style={[styles.toastWrap, { bottom: isDesktop ? 20 : bottomInset + 84, opacity: anim, transform: [{ translateY }] }]}>
+      style={[styles.toastWrap, { bottom: wide ? 20 : bottomInset + 84, opacity: anim, transform: [{ translateY }] }]}>
       <View style={[styles.toast, { backgroundColor: t.toast }]} accessibilityLiveRegion="polite">
         <Text numberOfLines={2} style={[styles.toastText, { color: t.toastText }]}>
           {toast.message}

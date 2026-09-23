@@ -9,7 +9,8 @@ import { ActionMenu, type MenuAction } from './common';
 import { AlarmScreen } from './AlarmScreen';
 import { DateTimeSheet } from './DateTimeSheet';
 import { Paywall } from './Paywall';
-import { isDesktop, isMac, useTheme } from './theme';
+import { useIsWide } from './layout';
+import { isMac, useTheme } from './theme';
 
 enum EditorMenu {
   Folder = 'folder',
@@ -28,6 +29,7 @@ const OPEN_PICKER_DELAY_MS = 450;
 export function EditorScreen({ target, onClose, expanded, onToggleExpand }: { target: NonNullable<EditorTarget>; onClose?: () => void; expanded?: boolean; onToggleExpand?: () => void }) {
   const t = useTheme();
   const insets = useSafeAreaInsets();
+  const wide = useIsWide();
   const existing = useStore(s => (target.kind === EditorKind.Existing ? s.notes[target.id] : undefined));
   const folders = useLists();
   const createNote = useStore(s => s.createNote);
@@ -229,9 +231,9 @@ export function EditorScreen({ target, onClose, expanded, onToggleExpand }: { ta
 
   return (
     <KeyboardAvoidingView behavior="padding" style={[styles.flex, { backgroundColor: t.bg }]}>
-      <View style={[styles.header, { borderBottomColor: t.border, paddingTop: isDesktop ? 10 : insets.top + 6, paddingLeft: insets.left + 12, paddingRight: insets.right + 8 }]}>
+      <View style={[styles.header, { borderBottomColor: t.border, paddingTop: wide ? 10 : insets.top + 6, paddingLeft: insets.left + 12, paddingRight: insets.right + 8 }]}>
         <Pressable testID="editor-done" accessibilityRole="button" onPress={done} hitSlop={10} style={styles.headerButton}>
-          <Text style={[styles.doneText, { color: t.accent }]}>{isDesktop ? 'Close' : 'Done'}</Text>
+          <Text style={[styles.doneText, { color: t.accent }]}>{wide ? 'Close' : 'Done'}</Text>
         </Pressable>
         <View style={styles.flex} />
         {onToggleExpand ? <HeaderIcon label={expanded ? '⤡' : '⤢'} a11y={expanded ? 'Exit full width' : 'Full width'} onPress={onToggleExpand} color={t.textSecondary} /> : null}
@@ -312,8 +314,8 @@ export function EditorScreen({ target, onClose, expanded, onToggleExpand }: { ta
 
       <DateTimeSheet visible={picker !== null} value={picker?.mode === PickerMode.Edit ? new Date(picker.reminder.due_at) : null} onCancel={() => setPicker(null)} onConfirm={confirmPicker} />
       <ActionMenu visible={menu === EditorMenu.Folder} title="Move to folder" actions={folderActions} onClose={() => setMenu(null)} />
-      {!isDesktop ? <Paywall /> : null}
-      {!isDesktop ? <AlarmScreen /> : null}
+      {!isMac ? <Paywall /> : null}
+      {!isMac ? <AlarmScreen /> : null}
       <ActionMenu visible={repeatMenu !== null} title="Repeat" actions={repeatActions} onClose={() => setRepeatMenu(null)} />
     </KeyboardAvoidingView>
   );

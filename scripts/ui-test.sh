@@ -10,8 +10,10 @@ PASSWORD="${RECALL_TEST_PASSWORD:-uitest-password-1}"
 
 eval "$("$SB" status -o env 2>/dev/null | grep -E '^(API_URL|SERVICE_ROLE_KEY)=')"
 
-echo "==> Resetting local database"
-"$SB" db reset >/dev/null
+if [ -z "${SKIP_DB_RESET:-}" ]; then
+  echo "==> Resetting local database"
+  "$SB" db reset >/dev/null
+fi
 
 echo "==> Creating test user $EMAIL"
 curl -sS -o /dev/null -X POST "$API_URL/auth/v1/admin/users" \
@@ -19,4 +21,4 @@ curl -sS -o /dev/null -X POST "$API_URL/auth/v1/admin/users" \
   -d "{\"email\":\"$EMAIL\",\"password\":\"$PASSWORD\",\"email_confirm\":true}"
 
 echo "==> Running Maestro flows"
-"${MAESTRO:-maestro}" ${DEVICE:+--device "$DEVICE"} test -e EMAIL="$EMAIL" -e PASSWORD="$PASSWORD" --test-output-dir .maestro/output "$@" "${FLOWS:-.maestro}"
+"${MAESTRO:-maestro}" ${DEVICE:+--device "$DEVICE"} test -e EMAIL="$EMAIL" -e PASSWORD="$PASSWORD" -e NEW_EMAIL="new-$EMAIL" --test-output-dir .maestro/output "$@" "${FLOWS:-.maestro}"

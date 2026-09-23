@@ -17,7 +17,7 @@ name: 06_account
 - assertVisible: "Create your account"
 - tapOn:
     id: "email"
-- inputText: "newuser@recall.local"
+- inputText: ${NEW_EMAIL}
 - assertVisible:
     text: "Create account"
     enabled: false
@@ -67,7 +67,7 @@ name: 06_account
 # The deleted account can no longer sign in
 - tapOn:
     id: "email"
-- inputText: "newuser@recall.local"
+- inputText: ${NEW_EMAIL}
 - tapOn:
     id: "password"
 - inputText: "long-enough-password"

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Modal, StyleSheet, View } from 'react-native';
-import { isMac } from './theme';
+import { isMac, isWeb } from './theme';
 
 export enum OverlayAnimation {
   Fade = 'fade',
@@ -27,7 +27,7 @@ export function Overlay({
     return visible ? <View style={styles.inline}>{children}</View> : null;
   }
   return (
-    <Modal visible={visible} transparent={transparent} animationType={animationType} onRequestClose={onRequestClose}>
+    <Modal visible={visible} transparent={transparent} animationType={isWeb ? OverlayAnimation.None : animationType} onRequestClose={onRequestClose}>
       {children}
     </Modal>
   );

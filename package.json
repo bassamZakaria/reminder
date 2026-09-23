@@ -12,6 +12,7 @@
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.web.json",
     "setup:supabase": "./scripts/setup-supabase.sh",
     "test:ui": "./scripts/ui-test.sh",
+    "release:check": "node scripts/check-release-config.mjs",
     "web": "vite",
     "web:build": "vite build",
     "web:preview": "vite preview --port 4173"

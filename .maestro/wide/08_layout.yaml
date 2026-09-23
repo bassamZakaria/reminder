@@ -1,0 +1,64 @@
+appId: com.bassamsalah.recall
+name: 08_layout
+---
+- runFlow: ../subflows/sign_in.yaml
+
+# Wide screens use the sidebar + list + detail layout, not the tab bar
+- assertVisible:
+    id: "nav-reminders"
+- assertVisible:
+    id: "nav-notes"
+- assertNotVisible:
+    id: "tab-reminders"
+- assertVisible: "Select a reminder to see its details"
+- takeScreenshot: screenshots/08-wide-reminders
+
+# Add a reminder from the list pane header
+- tapOn:
+    id: "new-reminder"
+- extendedWaitUntil:
+    visible:
+      id: "date-confirm"
+    timeout: 8000
+- takeScreenshot: screenshots/08-wide-datesheet
+- tapOn: "Tomorrow 9 AM"
+- tapOn:
+    id: "date-confirm"
+- waitForAnimationToEnd
+- tapOn:
+    id: "note-title"
+- inputText: "Tablet layout check"
+- tapOn:
+    id: "note-body"
+- inputText: "Opened in the detail pane"
+- takeScreenshot: screenshots/08-wide-editor
+- tapOn:
+    id: "editor-done"
+    retryTapIfNoChange: true
+
+# The reminder shows in the list; selecting it opens the note beside it
+- extendedWaitUntil:
+    visible:
+      id: "reminder-Tablet layout check"
+    timeout: 8000
+- tapOn:
+    id: "reminder-Tablet layout check"
+- assertVisible:
+    id: "note-reminders"
+- assertVisible: "Opened in the detail pane"
+- takeScreenshot: screenshots/08-wide-selected
+- tapOn:
+    id: "editor-done"
+    retryTapIfNoChange: true
+
+# Notes and Settings from the sidebar
+- tapOn:
+    id: "nav-notes"
+- assertVisible:
+    id: "row-Tablet layout check"
+- takeScreenshot: screenshots/08-wide-notes
+- tapOn:
+    id: "nav-settings"
+- assertVisible: "Settings"
+- assertVisible: "Recall Premium"
+- takeScreenshot: screenshots/08-wide-settings

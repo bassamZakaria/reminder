@@ -114,6 +114,12 @@ android {
     }
 }
 
+gradle.taskGraph.whenReady { graph ->
+    if (graph.hasTask(":app:bundleRelease") && !project.hasProperty("RECALL_UPLOAD_STORE_FILE")) {
+        throw new GradleException("Play uploads need the upload key: set RECALL_UPLOAD_STORE_FILE, RECALL_UPLOAD_STORE_PASSWORD, RECALL_UPLOAD_KEY_ALIAS and RECALL_UPLOAD_KEY_PASSWORD (see docs/store-submission.md).")
+    }
+}
+
 dependencies {
     // The version of react-native is set by the React Native Gradle Plugin
     implementation("com.facebook.react:react-android")

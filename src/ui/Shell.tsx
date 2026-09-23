@@ -11,7 +11,8 @@ import { Paywall } from './Paywall';
 import { ReminderList } from './ReminderList';
 import { SettingsScreen } from './SettingsScreen';
 import { Sidebar } from './Sidebar';
-import { isDesktop, useTheme } from './theme';
+import { useIsWide } from './layout';
+import { useTheme } from './theme';
 
 const TAB_BAR_HEIGHT = 52;
 
@@ -46,6 +47,7 @@ export function Shell() {
   const closeEditor = useStore(s => s.closeEditor);
   const openEditor = useStore(s => s.openEditor);
   const [expanded, setExpanded] = useState(false);
+  const wide = useIsWide();
 
   const folderId = view.kind === ViewKind.Folder ? view.id : null;
   const newItem = () =>
@@ -53,7 +55,7 @@ export function Shell() {
       ? openEditor({ kind: EditorKind.New, listId: null, nonce: Date.now(), withReminder: true })
       : openEditor({ kind: EditorKind.New, listId: folderId, nonce: Date.now() });
 
-  const bottomInset = isDesktop ? 0 : TAB_BAR_HEIGHT + insets.bottom;
+  const bottomInset = wide ? 0 : TAB_BAR_HEIGHT + insets.bottom;
   const content =
     view.kind === ViewKind.Settings ? (
       <SettingsScreen bottomInset={bottomInset} />
@@ -63,7 +65,7 @@ export function Shell() {
       <NoteList bottomInset={bottomInset} />
     );
 
-  if (isDesktop) {
+  if (wide) {
     return (
       <View style={[styles.row, { backgroundColor: t.bg }]}>
         {!expanded ? <Sidebar /> : null}

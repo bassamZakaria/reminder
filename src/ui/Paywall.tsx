@@ -2,24 +2,25 @@ import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Keyboard, Linking, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FREE_REMINDER_LIMIT, PREMIUM_FEATURES, TRIAL_DAYS } from '../lib/premium';
-import { BillingPeriod, ProductId, StoreState, type StoreProduct } from '../lib/purchases';
+import { BillingPeriod, ProductId, STORE_NAME, StoreState, type StoreProduct } from '../lib/purchases';
 import { links } from '../lib/supabase';
 import { useStore } from '../store/useStore';
 import { Button } from './common';
 import { Overlay } from './Overlay';
-import { isDesktop, useTheme } from './theme';
+import { useIsWide } from './layout';
+import { useTheme } from './theme';
 
 const PERIOD_LABEL: Record<BillingPeriod, string> = {
   [BillingPeriod.Month]: 'month',
   [BillingPeriod.Year]: 'year',
 };
 
-const STORE_NAME = Platform.OS === 'android' ? 'Google Play' : 'Apple ID';
 const CAN_PURCHASE = Platform.OS !== 'web';
 
 export function Paywall() {
   const t = useTheme();
   const insets = useSafeAreaInsets();
+  const wide = useIsWide();
   const feature = useStore(s => s.paywall);
   const products = useStore(s => s.products);
   const storeState = useStore(s => s.storeState);
@@ -48,7 +49,7 @@ export function Paywall() {
 
   return (
     <Overlay visible={feature !== null} transparent={false} onRequestClose={closePaywall}>
-      <View style={[styles.wrap, { backgroundColor: t.bg, paddingTop: isDesktop ? 16 : insets.top + 8, paddingBottom: insets.bottom + 12 }]}>
+      <View style={[styles.wrap, { backgroundColor: t.bg, paddingTop: wide ? 16 : insets.top + 8, paddingBottom: insets.bottom + 12 }]}>
         <View style={[styles.header, { paddingLeft: insets.left + 12, paddingRight: insets.right + 12 }]}>
           <Pressable testID="paywall-close" accessibilityRole="button" accessibilityLabel="Close" onPress={closePaywall} hitSlop={8} style={styles.close}>
             <Text style={[styles.closeText, { color: t.textSecondary }]}>✕</Text>
@@ -196,8 +197,8 @@ const styles = StyleSheet.create({
   radio: { width: 22, height: 22, borderRadius: 11, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
   radioDot: { width: 10, height: 10, borderRadius: 5 },
   planTitle: { fontSize: 16, fontWeight: '700' },
-  planDetail: { fontSize: 13, fontWeight: '500' },
-  planPrice: { fontSize: 16, fontWeight: '700' },
+  planDetail: { fontSize: 13, fontWeight: '600' },
+  planPrice: { fontSize: 20, fontWeight: '800' },
   cta: { marginTop: 20, minHeight: 52 },
   terms: { fontSize: 12, lineHeight: 17, marginTop: 12, textAlign: 'center' },
   links: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 16, marginTop: 12 },

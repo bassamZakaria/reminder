@@ -7,7 +7,8 @@ import { EditorKind, useReminders, useStore } from '../store/useStore';
 import { ReminderFilter, type Reminder } from '../types';
 import { ActionMenu, Empty, ErrorBanner, IconButton, Input, type MenuAction } from './common';
 import { ReminderRow } from './ReminderRow';
-import { isDesktop, useTheme } from './theme';
+import { useIsWide } from './layout';
+import { useTheme } from './theme';
 
 const FILTER_LABELS: Record<ReminderFilter, string> = {
   [ReminderFilter.Upcoming]: 'Upcoming',
@@ -17,6 +18,7 @@ const FILTER_LABELS: Record<ReminderFilter, string> = {
 export function ReminderList({ bottomInset }: { bottomInset: number }) {
   const t = useTheme();
   const insets = useSafeAreaInsets();
+  const wide = useIsWide();
   const reminders = useReminders();
   const notes = useStore(s => s.notes);
   const search = useStore(s => s.search);
@@ -84,11 +86,11 @@ export function ReminderList({ bottomInset }: { bottomInset: number }) {
     ? { icon: '🔍', title: 'No results', hint: `No reminders match “${search.trim()}”.` }
     : filter === ReminderFilter.Done
     ? { icon: '✓', title: 'Nothing completed yet', hint: 'Tick a reminder’s circle to complete it.' }
-    : { icon: '⏰', title: 'You’re all caught up', hint: isDesktop ? 'Press ＋ to add a reminder.' : 'Tap ＋ to add a reminder.' };
+    : { icon: '⏰', title: 'You’re all caught up', hint: wide ? 'Press ＋ to add a reminder.' : 'Tap ＋ to add a reminder.' };
 
   return (
     <View style={[styles.wrap, { backgroundColor: t.bg }]}>
-      <View style={[styles.header, { paddingTop: isDesktop ? 14 : insets.top + 6, paddingLeft: insets.left + 16, paddingRight: insets.right + 12 }]}>
+      <View style={[styles.header, { paddingTop: wide ? 14 : insets.top + 6, paddingLeft: insets.left + 16, paddingRight: insets.right + 12 }]}>
         <View style={styles.headerText}>
           <Text numberOfLines={1} style={[styles.title, { color: t.text }]} accessibilityRole="header">
             Reminders
@@ -98,7 +100,7 @@ export function ReminderList({ bottomInset }: { bottomInset: number }) {
             {openCount} upcoming
           </Text>
         </View>
-        {isDesktop ? <IconButton testID="new-reminder" label="＋" size={22} accessibilityLabel="New reminder" onPress={newReminder} /> : null}
+        {wide ? <IconButton testID="new-reminder" label="＋" size={22} accessibilityLabel="New reminder" onPress={newReminder} /> : null}
       </View>
 
       <View style={[styles.controls, { paddingLeft: insets.left + 12, paddingRight: insets.right + 12 }]}>
@@ -131,7 +133,7 @@ export function ReminderList({ bottomInset }: { bottomInset: number }) {
         sections={sections}
         keyExtractor={r => r.id}
         renderItem={({ item }) => (
-          <ReminderRow reminder={item} siblingCount={Math.max(0, (siblings[item.note_id] ?? 0) - (item.is_completed ? 0 : 1))} expanded={expandedId === item.id} onToggleExpand={toggleExpand} onLongPress={onLongPress} />
+          <ReminderRow reminder={item} wide={wide} siblingCount={Math.max(0, (siblings[item.note_id] ?? 0) - (item.is_completed ? 0 : 1))} expanded={expandedId === item.id} onToggleExpand={toggleExpand} onLongPress={onLongPress} />
         )}
         renderSectionHeader={({ section }) => (
           <View style={[styles.sectionHeader, { backgroundColor: t.bg }]}>
@@ -139,11 +141,11 @@ export function ReminderList({ bottomInset }: { bottomInset: number }) {
             <Text style={[styles.sectionCount, { color: t.muted }]}>{section.data.length}</Text>
           </View>
         )}
-        stickySectionHeadersEnabled={!isDesktop}
+        stickySectionHeadersEnabled={!wide}
         contentContainerStyle={sections.length === 0 ? styles.emptyContainer : { paddingBottom: bottomInset + 90 }}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
-        refreshControl={isDesktop ? undefined : <RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={t.muted} />}
+        refreshControl={wide ? undefined : <RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={t.muted} />}
         ListEmptyComponent={<Empty icon={empty.icon} title={empty.title} hint={empty.hint} />}
       />
 

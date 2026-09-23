@@ -103,8 +103,13 @@ object AlarmScheduler {
     when {
       !canScheduleExact(context) -> manager.setWindow(AlarmManager.RTC_WAKEUP, triggerAt, 60_000, fireIntent)
       alert.alertType == AlertType.ALARM -> {
-        val show = PendingIntent.getActivity(context, 0, context.packageManager.getLaunchIntentForPackage(context.packageName), PendingIntent.FLAG_IMMUTABLE)
-        manager.setAlarmClock(AlarmManager.AlarmClockInfo(triggerAt, show), fireIntent)
+        val launch = context.packageManager.getLaunchIntentForPackage(context.packageName)
+        if (launch == null) {
+          manager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAt, fireIntent)
+        } else {
+          val show = PendingIntent.getActivity(context, 0, launch, PendingIntent.FLAG_IMMUTABLE)
+          manager.setAlarmClock(AlarmManager.AlarmClockInfo(triggerAt, show), fireIntent)
+        }
       }
       else -> manager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAt, fireIntent)
     }

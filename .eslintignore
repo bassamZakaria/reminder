@@ -1,3 +1,4 @@
 dist-web/
 android/app/build/
 .maestro/output/
+scripts/

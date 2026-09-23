@@ -1,4 +1,4 @@
-import { NativeEventEmitter, NativeModules } from 'react-native';
+import { NativeEventEmitter, NativeModules, Platform } from 'react-native';
 
 export enum ProductId {
   Monthly = 'recall_premium_monthly',
@@ -59,6 +59,8 @@ const native: NativeRecallStore | undefined = NativeModules.RecallStore;
 const emitter = native ? new NativeEventEmitter(native as never) : null;
 
 export const NO_ENTITLEMENT: Entitlement = { active: false, productId: null, expiresAt: null, inTrial: false, willRenew: false };
+
+export const STORE_NAME = Platform.OS === 'android' ? 'Google Play' : 'Apple ID';
 
 export const purchases = {
   available: !!native,

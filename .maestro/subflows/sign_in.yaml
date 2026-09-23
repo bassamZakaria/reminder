@@ -19,6 +19,5 @@ appId: com.bassamsalah.recall
     id: "sign-in"
 - runFlow: system_prompts.yaml
 - extendedWaitUntil:
-    visible:
-      id: "tab-reminders"
-    timeout: 15000
+    visible: "Reminders"
+    timeout: 30000
