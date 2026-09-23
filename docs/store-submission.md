@@ -44,7 +44,8 @@ Recall uses the stores' own billing: StoreKit on iPhone and Mac, Google Play Bil
 4. **Create the demo account** for reviewers: `DEMO_EMAIL=review@yourdomain.com DEMO_PASSWORD=… ./scripts/setup-supabase.sh`. Add a few notes and reminders to it.
 5. **Run `yarn release:check`** and rebuild the apps so they embed the final `app.config.json`.
 6. **Apple Developer Program** membership (paid) and **Google Play Console** account.
-7. In Xcode, enable the **Time Sensitive Notifications** capability for the app id (the entitlement files are already wired) so alarm notifications keep their interruption level on iOS 25 and earlier.
+7. **Sign the Mac app.** The macOS target is sandboxed, so it needs a Mac provisioning profile: open `macos/Recall.xcworkspace`, sign in under Signing & Capabilities (team `78VKP3FU63`), or build once with `xcodebuild … -allowProvisioningUpdates`. Without a profile the Mac build fails with "has entitlements that require signing with a development certificate".
+8. In Xcode, enable the **Time Sensitive Notifications** capability for the app id (the entitlement files are already wired) so alarm notifications keep their interruption level on iOS 25 and earlier.
 
 ## App Store Connect
 
