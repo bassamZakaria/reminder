@@ -36,7 +36,7 @@ Recall uses the stores' own billing: StoreKit on iPhone and Mac, Google Play Bil
 
 ## Before you submit
 
-1. **Host the legal pages.** Publish `docs/privacy-policy.md`, `docs/terms.md` and `docs/support.md` (GitHub Pages works) and replace `YOUR_CONTACT_EMAIL` in all three with the address you support the app from.
+1. **Host the legal pages.** Publish `docs/privacy-policy.md`, `docs/terms.md` and `docs/support.md` (GitHub Pages works). They are already addressed to bassam.s.zakaria@gmail.com.
 2. **Deploy the web app** (`yarn web:build`, upload `dist-web/`). Password reset links open it, so it must be live before sign-ups are.
 3. **Set up email delivery.** Supabase's built-in mailer only writes to project members, so real sign-ups and password resets never arrive without it. Re-run the setup script with the links and an SMTP provider:
    `PRIVACY_POLICY_URL=… SUPPORT_URL=… TERMS_URL=… WEB_URL=… SMTP_HOST=… SMTP_PORT=587 SMTP_USER=… SMTP_PASS=… SMTP_SENDER=support@yourdomain.com ./scripts/setup-supabase.sh`

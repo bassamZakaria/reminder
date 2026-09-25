@@ -41,4 +41,4 @@ We may update these terms; the date above shows the last change. Significant cha
 
 ## Contact
 
-Questions about these terms: **YOUR_CONTACT_EMAIL**
+Questions about these terms: **bassam.s.zakaria@gmail.com**

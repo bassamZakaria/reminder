@@ -25,10 +25,10 @@ On the sign-in screen, type your email and tap **Forgot password?**. Open the li
 
 **Settings › Delete Account** permanently deletes your account and all of your notes, reminders and folders from our servers. It cannot be undone.
 
-If you no longer have the app installed, email **YOUR_CONTACT_EMAIL** from the address you signed up with and ask us to delete your account; we delete it and all of its data within 30 days and confirm by email.
+If you no longer have the app installed, email **bassam.s.zakaria@gmail.com** from the address you signed up with and ask us to delete your account; we delete it and all of its data within 30 days and confirm by email.
 
 Deleting your account does not cancel a Recall Premium subscription. Cancel that in your Apple ID or Google Play subscription settings.
 
 ## Contact
 
-Email **YOUR_CONTACT_EMAIL**. We reply within two working days.
+Email **bassam.s.zakaria@gmail.com**. We reply within two working days.

@@ -46,4 +46,4 @@ If this policy changes, we will update the date above and, for significant chang
 
 ## Contact
 
-Questions or requests about your data: **YOUR_CONTACT_EMAIL**
+Questions or requests about your data: **bassam.s.zakaria@gmail.com**
